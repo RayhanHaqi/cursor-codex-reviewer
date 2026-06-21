@@ -98,12 +98,9 @@ Prompt instructions alone do **not** technically prevent writes in `workspace-wr
 
 ## Environment configuration
 
-The skill does **not** automatically source shell profiles (`.bashrc`, `.zshrc`, `.profile`, etc.).
+The skill does **not** source shell profiles or environment files automatically.
 
-Safer alternatives:
-
-1. Launch Cursor from an environment where `codex` is already available.
-2. Optionally set `CODEX_REVIEW_ENV_FILE` to an explicitly configured environment file. The skill sources only that file when set. It may contain sensitive variables and is never auto-discovered.
+Launch Cursor from an environment where `codex` is already on `PATH` and any required variables are already configured.
 
 ## Categories of risky actions
 

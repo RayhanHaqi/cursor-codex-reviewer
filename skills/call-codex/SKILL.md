@@ -1,5 +1,7 @@
 # call-codex
 
+skill-release: 0.1.2
+
 Use this skill when the user asks to call Codex, get a Codex second opinion, review an implementation or diff, critique a plan, verify a change, or inspect failing tests using Codex.
 
 ## Purpose
@@ -117,9 +119,11 @@ Always prepare the Codex prompt and command first, then ask the user using popup
 
 After Cursor prepares a `/call-codex` prompt, Cursor must not end with only plain-text next steps.
 
-This applies to both normal `/call-codex` mode and `/call-codex workflow only` mode.
+This applies to normal `/call-codex` mode.
 
-Cursor must call `AskQuestion` for the next step after showing the prepared prompt and command.
+Exception — `/call-codex workflow only`: do **not** show the run-approval popup in the same turn. Stop after the prompt summary and exact command. Ask the run-approval popup only in a later turn after the user has reviewed the prepared prompt.
+
+For all other modes, Cursor must call `AskQuestion` for the next step after showing the prepared prompt and command.
 
 Required popup title:
 
@@ -452,21 +456,7 @@ Verification context:
    Replace `<model>` with an available Codex model (e.g. the user's configured default).
    Replace `<selected-effort>` with exactly one value appropriate for the chosen depth (e.g. `medium`, `high`, or `xhigh`).
 
-   Do not automatically source `.bashrc`, `.zshrc`, `.profile`, `.bash_profile`, or equivalent shell configuration.
-
-   Environment setup alternatives:
-
-   1. Launch Cursor from an environment where `codex` is already on `PATH` and any needed variables are already exported.
-   2. Optionally, if the user has explicitly configured `CODEX_REVIEW_ENV_FILE`, source only that file in the same shell before `exec codex`:
-
-   ```bash
-   if [[ -n "${CODEX_REVIEW_ENV_FILE:-}" && -r "${CODEX_REVIEW_ENV_FILE}" ]]; then
-     # shellcheck disable=SC1090
-     source "${CODEX_REVIEW_ENV_FILE}"
-   fi
-   ```
-
-   Never auto-discover environment files. Never print secrets. `CODEX_REVIEW_ENV_FILE` may contain sensitive variables.
+   Launch Cursor from an environment where `codex` is already on `PATH` and any required variables are already configured. The skill does not source shell profiles or environment files automatically.
 
    If `-s read-only` fails because of local bubblewrap/user-namespace sandbox issues, do not switch silently. Ask the user using the **Degraded containment fallback** approval requirements (see Sandbox modes) before using:
 
@@ -490,7 +480,7 @@ Verification context:
 
 ## Prompt file handling
 
-Do not use predictable fixed filenames such as `/tmp/codex-review-prompt.md`.
+Do not use predictable fixed filenames in shared temporary directories.
 
 For each invocation:
 

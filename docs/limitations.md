@@ -1,6 +1,6 @@
 # Limitations
 
-This project is **experimental (v0.1.1)**. Understand these limitations before relying on it.
+This project is **experimental (v0.1.2)**. Understand these limitations before relying on it.
 
 ## Review quality
 

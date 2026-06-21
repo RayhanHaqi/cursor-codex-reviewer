@@ -46,6 +46,17 @@ require_grep() {
   fi
 }
 
+require_no_grep() {
+  local file="$1"
+  local pattern="$2"
+  local label="$3"
+  if grep -q "${pattern}" "${file}"; then
+    fail "${label} (forbidden pattern '${pattern}' found in ${file#${REPO_ROOT}/})"
+  else
+    pass "${label}"
+  fi
+}
+
 echo "cursor-codex-reviewer smoke test"
 echo "================================="
 echo
@@ -107,21 +118,24 @@ done
 echo
 
 SKILL_FILE="${REPO_ROOT}/skills/call-codex/SKILL.md"
+require_grep "${SKILL_FILE}" "skill-release: 0.1.2" "SKILL.md includes skill-release marker"
 require_grep "${SKILL_FILE}" "read-only" "SKILL.md mentions read-only"
 require_grep "${SKILL_FILE}" "explicit approval" "SKILL.md mentions explicit approval"
 require_grep "${SKILL_FILE}" "workspace-write" "SKILL.md mentions workspace-write"
-require_grep "${SKILL_FILE}" "structured review" "SKILL.md mentions structured review"
-require_grep "${SKILL_FILE}" "commit" "SKILL.md mentions commit"
-require_grep "${SKILL_FILE}" "push" "SKILL.md mentions push"
 require_grep "${SKILL_FILE}" "mktemp" "SKILL.md mentions mktemp"
 require_grep "${SKILL_FILE}" "chmod 600" "SKILL.md mentions chmod 600"
 require_grep "${SKILL_FILE}" "trap" "SKILL.md mentions cleanup trap"
-require_grep "${SKILL_FILE}" "CODEX_REVIEW_ENV_FILE" "SKILL.md mentions CODEX_REVIEW_ENV_FILE"
+require_no_grep "${SKILL_FILE}" "/tmp/codex-review-prompt.md" "SKILL.md excludes fixed prompt path"
+require_no_grep "${SKILL_FILE}" "CODEX_REVIEW_ENV_FILE" "SKILL.md excludes automatic env file sourcing"
+require_no_grep "${SKILL_FILE}" '\.bashrc' "SKILL.md excludes shell-profile references"
+require_no_grep "${SKILL_FILE}" 'source.*\.profile' "SKILL.md excludes shell-profile sourcing instructions"
+require_grep "${SKILL_FILE}" "show the run-approval popup in the same turn" "SKILL.md defers workflow-only run-approval popup"
+require_grep "${SKILL_FILE}" "Do not ask the run-approval popup yet" "SKILL.md stops before workflow-only run approval"
 
 echo
 
 README_FILE="${REPO_ROOT}/README.md"
-require_grep "${README_FILE}" "Experimental / v0.1.1" "README mentions Experimental / v0.1.1"
+require_grep "${README_FILE}" "Experimental / v0.1.2" "README mentions Experimental / v0.1.2"
 require_grep "${README_FILE}" "read-only" "README mentions read-only"
 require_grep "${README_FILE}" "Cursor" "README mentions Cursor"
 require_grep "${README_FILE}" "Codex" "README mentions Codex"
@@ -132,14 +146,25 @@ require_grep "${SAFETY_FILE}" "Degraded containment fallback" "safety docs conta
 
 INSTALL_FILE="${REPO_ROOT}/scripts/install.sh"
 UNINSTALL_FILE="${REPO_ROOT}/scripts/uninstall.sh"
-require_grep "${INSTALL_FILE}" "path_safety_validate_dest" "installer uses dangerous path checks"
-require_grep "${UNINSTALL_FILE}" "path_safety_validate_dest" "uninstaller uses dangerous path checks"
-require_grep "${INSTALL_FILE}" "allow-custom-outside-cursor-skills" "installer contains custom outside-root opt-in flag"
+require_grep "${INSTALL_FILE}" 'source "${SCRIPT_DIR}/lib/path-safety.sh"' "installer sources path-safety.sh"
+require_grep "${UNINSTALL_FILE}" 'source "${SCRIPT_DIR}/lib/path-safety.sh"' "uninstaller sources path-safety.sh"
+require_grep "${INSTALL_FILE}" "path_safety_validate_dest" "installer uses path_safety_validate_dest"
+require_grep "${UNINSTALL_FILE}" "path_safety_validate_dest" "uninstaller uses path_safety_validate_dest"
+require_grep "${INSTALL_FILE}" "allow-custom-outside-cursor-skills" "installer includes custom outside-root opt-in flag"
+require_grep "${UNINSTALL_FILE}" "allow-custom-outside-cursor-skills" "uninstaller includes custom outside-root opt-in flag"
+require_grep "${INSTALL_FILE}" 'rm -rf --' "installer uses safe rm delimiter"
+require_grep "${UNINSTALL_FILE}" 'rm -rf --' "uninstaller uses safe rm delimiter"
 require_grep "${REPO_ROOT}/scripts/lib/path-safety.sh" "path_safety_refuse_symlink_dest" "path safety includes symlink rejection helper"
-require_grep "${REPO_ROOT}/scripts/lib/path-safety.sh" "path_safety_canonicalize_non_symlink_path" "path safety canonicalizes only after symlink check"
+require_grep "${REPO_ROOT}/scripts/lib/path-safety.sh" "path_safety_refuse_symlink_parents" "path safety includes symlink parent rejection helper"
+require_grep "${REPO_ROOT}/scripts/lib/path-safety.sh" "path_safety_physical_pwd" "path safety uses physical pwd for prefix checks"
 require_grep "${REPO_ROOT}/tests/lifecycle-test.sh" "Symlink safety tests" "lifecycle test includes symlink coverage"
-require_grep "${INSTALL_FILE}" "path_safety_refuse_symlink_dest" "installer references symlink-safe validation"
-require_grep "${UNINSTALL_FILE}" "path_safety_refuse_symlink_dest" "uninstaller references symlink-safe validation"
+require_grep "${REPO_ROOT}/tests/lifecycle-test.sh" "Symlink parent safety tests" "lifecycle test includes symlink parent coverage"
+
+DOCTOR_FILE="${REPO_ROOT}/scripts/doctor.sh"
+require_grep "${DOCTOR_FILE}" "skill-release" "doctor checks skill-release marker"
+require_grep "${DOCTOR_FILE}" "LEGACY_SKILL_PATTERNS" "doctor defines legacy skill patterns"
+require_grep "${DOCTOR_FILE}" "/tmp/codex-review-prompt.md" "doctor detects legacy fixed prompt path"
+require_grep "${DOCTOR_FILE}" "install.sh --force" "doctor recommends force reinstall for drift"
 
 echo
 echo "================================="

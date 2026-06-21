@@ -77,9 +77,12 @@ if [[ -e "${OPERATIONAL_DEST}" ]]; then
   fi
 
   echo "Replacing existing installation at:"
+  echo "  requested:  ${DEST}"
   echo "  expanded:   ${OPERATIONAL_DEST}"
   echo "  canonical:  ${CANONICAL_DEST}"
-  rm -rf "${OPERATIONAL_DEST}"
+
+  path_safety_refuse_symlink_dest "${OPERATIONAL_DEST}" "modify"
+  rm -rf -- "${OPERATIONAL_DEST}"
 fi
 
 mkdir -p "${OPERATIONAL_DEST}"

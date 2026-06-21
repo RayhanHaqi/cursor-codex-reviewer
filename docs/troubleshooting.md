@@ -177,7 +177,9 @@ The skill assumes bash-style command examples for Codex invocation.
 
 **Symptom:** Codex cannot find credentials or optional integration variables.
 
+**Note:** Automatic shell-profile sourcing is intentionally disabled. The `/call-codex` skill does not source shell profiles or environment files.
+
 **Fix:**
-1. Launch Cursor from a shell where `codex` is already on `PATH`.
-2. Optionally set `CODEX_REVIEW_ENV_FILE` to a private environment file (see `.env.example`).
-3. Do not rely on automatic `.bashrc` / `.zshrc` sourcing — it is intentionally disabled.
+1. Launch Cursor from an environment where `codex` is already on `PATH`.
+2. Export required variables in that environment before starting Cursor.
+3. Do not expect the skill to load private environment files automatically.

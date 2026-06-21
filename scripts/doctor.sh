@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_SKILL_FILE="${REPO_ROOT}/skills/call-codex/SKILL.md"
+
 DEFAULT_SKILL_PATH="${HOME}/.cursor/skills/call-codex"
 SKILL_PATH="${DEFAULT_SKILL_PATH}"
 ERRORS=0
 WARNINGS=0
 NOTES=0
+
+LEGACY_SKILL_PATTERNS=(
+  '/tmp/codex-review-prompt.md'
+  'CODEX_REVIEW_ENV_FILE'
+  '\.bashrc'
+)
 
 usage() {
   cat <<'EOF'
@@ -93,14 +103,64 @@ else
   error "call-codex skill not found at ${SKILL_PATH}. Run ./scripts/install.sh"
 fi
 
-if [[ -f "${SKILL_PATH}/SKILL.md" ]]; then
-  if [[ -r "${SKILL_PATH}/SKILL.md" ]]; then
-    echo "skill file: readable (${SKILL_PATH}/SKILL.md)"
+INSTALLED_SKILL_FILE="${SKILL_PATH}/SKILL.md"
+
+if [[ -f "${INSTALLED_SKILL_FILE}" ]]; then
+  if [[ -r "${INSTALLED_SKILL_FILE}" ]]; then
+    echo "skill file: readable (${INSTALLED_SKILL_FILE})"
   else
-    error "SKILL.md exists but is not readable: ${SKILL_PATH}/SKILL.md"
+    error "SKILL.md exists but is not readable: ${INSTALLED_SKILL_FILE}"
   fi
 else
   error "SKILL.md missing in ${SKILL_PATH}"
+fi
+
+if [[ -f "${INSTALLED_SKILL_FILE}" && -f "${REPO_SKILL_FILE}" ]]; then
+  installed_release=""
+  repo_release=""
+
+  if grep -qE '^skill-release:[[:space:]]*' "${INSTALLED_SKILL_FILE}"; then
+    installed_release="$(grep -E '^skill-release:[[:space:]]*' "${INSTALLED_SKILL_FILE}" | head -n1 | sed 's/^skill-release:[[:space:]]*//')"
+  fi
+
+  if grep -qE '^skill-release:[[:space:]]*' "${REPO_SKILL_FILE}"; then
+    repo_release="$(grep -E '^skill-release:[[:space:]]*' "${REPO_SKILL_FILE}" | head -n1 | sed 's/^skill-release:[[:space:]]*//')"
+  fi
+
+  if [[ -n "${installed_release}" && -n "${repo_release}" ]]; then
+    if [[ "${installed_release}" == "${repo_release}" ]]; then
+      echo "skill release: ${installed_release} (matches repo)"
+    else
+      warn "installed skill release (${installed_release}) differs from repo (${repo_release}). Run ./scripts/install.sh --force to sync."
+    fi
+  elif [[ -z "${installed_release}" ]]; then
+    warn "installed SKILL.md has no skill-release marker. It may be stale. Run ./scripts/install.sh --force to sync."
+  fi
+
+  legacy_found=0
+  for pattern in "${LEGACY_SKILL_PATTERNS[@]}"; do
+    if grep -qE "${pattern}" "${INSTALLED_SKILL_FILE}"; then
+      if [[ "${legacy_found}" -eq 0 ]]; then
+        warn "installed SKILL.md contains legacy patterns from an older release:"
+        legacy_found=1
+      fi
+      warn "  - matches: ${pattern}"
+    fi
+  done
+
+  if [[ "${legacy_found}" -eq 1 ]]; then
+    warn "Run ./scripts/install.sh --force from the repo to replace the stale install."
+  fi
+
+  if ! cmp -s "${INSTALLED_SKILL_FILE}" "${REPO_SKILL_FILE}"; then
+    if [[ "${legacy_found}" -eq 0 && ( -z "${installed_release}" || -z "${repo_release}" || "${installed_release}" != "${repo_release}" ) ]]; then
+      note "installed SKILL.md differs from repo copy (content drift detected)."
+    elif [[ "${legacy_found}" -eq 0 && -n "${installed_release}" && -n "${repo_release}" && "${installed_release}" == "${repo_release}" ]]; then
+      note "installed SKILL.md differs from repo copy despite matching skill-release marker (local edits or packaging drift)."
+    fi
+  fi
+elif [[ ! -f "${REPO_SKILL_FILE}" ]]; then
+  note "repo SKILL.md not found at ${REPO_SKILL_FILE}; skipping release/drift checks."
 fi
 
 echo
@@ -112,15 +172,7 @@ else
   note "No ~/.cursor/mcp.json found. Core review still works; optional MCP integrations are unavailable."
 fi
 
-if [[ -n "${CODEX_REVIEW_ENV_FILE:-}" ]]; then
-  if [[ -r "${CODEX_REVIEW_ENV_FILE}" ]]; then
-    note "CODEX_REVIEW_ENV_FILE is set and readable. Optional environment variables may be loaded explicitly."
-  else
-    warn "CODEX_REVIEW_ENV_FILE is set but not readable: ${CODEX_REVIEW_ENV_FILE}"
-  fi
-else
-  note "CODEX_REVIEW_ENV_FILE is not set. This is normal; launch Cursor with codex on PATH or configure an explicit env file."
-fi
+note "The call-codex skill does not source shell profiles or environment files. Launch Cursor with codex on PATH and required variables already configured."
 
 echo
 echo "Summary"

@@ -23,7 +23,6 @@ path_safety_expand_path() {
   esac
 }
 
-# Backward-compatible alias.
 path_safety_expand_tilde() {
   path_safety_expand_path "$1"
 }
@@ -32,8 +31,45 @@ path_safety_is_symlink() {
   [[ -L "$1" ]]
 }
 
-# Reject symlink destinations before canonicalization.
-# Args: expanded_path operation(modify|remove)
+path_safety_physical_pwd() {
+  local dir="$1"
+  (cd "${dir}" && pwd -P)
+}
+
+# Reject symlink components in existing parent directories of a path.
+path_safety_refuse_symlink_parents() {
+  local path="$1"
+  local current="/"
+  local remainder="${path#/}"
+  local part
+
+  [[ "${path}" == /* ]] || return 0
+
+  while [[ -n "${remainder}" ]]; do
+    if [[ "${remainder}" == */* ]]; then
+      part="${remainder%%/*}"
+      remainder="${remainder#*/}"
+    else
+      part="${remainder}"
+      remainder=""
+    fi
+
+    current="${current%/}/${part}"
+
+    if [[ -n "${remainder}" ]]; then
+      if [[ -e "${current}" || -L "${current}" ]]; then
+        if [[ -L "${current}" ]]; then
+          echo "error: refusing path with symlink parent component: ${current}" >&2
+          echo "error: remove or replace the symlink manually if this is intentional" >&2
+          return 1
+        fi
+      fi
+    fi
+  done
+
+  return 0
+}
+
 path_safety_refuse_symlink_dest() {
   local dest="$1"
   local operation="${2:-modify}"
@@ -98,7 +134,7 @@ path_safety_canonicalize_non_symlink_path() {
   base="$(basename "${expanded}")"
 
   if [[ -d "${parent}" ]]; then
-    resolved="$(cd "${parent}" && pwd)/${base}"
+    resolved="$(path_safety_physical_pwd "${parent}")/${base}"
     printf '%s\n' "${resolved}"
     return 0
   fi
@@ -112,16 +148,11 @@ path_safety_canonicalize_non_symlink_path() {
   fi
 
   if command -v python3 >/dev/null 2>&1; then
-    resolved="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "${expanded}" 2>/dev/null || true)"
+    resolved="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "${expanded}" 2>/dev/null || true)"
     if [[ -n "${resolved:-}" ]]; then
       printf '%s\n' "${resolved}"
       return 0
     fi
-  fi
-
-  if [[ "${expanded}" == /* ]]; then
-    printf '%s\n' "${expanded}"
-    return 0
   fi
 
   echo "error: could not canonicalize destination path safely: ${expanded}" >&2
@@ -146,15 +177,12 @@ path_safety_is_forbidden_dest() {
 path_safety_under_cursor_skills() {
   local dest="$1"
   local home="${2:-${HOME}}"
-  local prefix="${home}/.cursor/skills/"
+  local prefix
 
+  prefix="$(path_safety_physical_pwd "${home}/.cursor/skills" 2>/dev/null || printf '%s' "${home}/.cursor/skills")/"
   [[ "${dest}" == "${prefix}"* ]]
 }
 
-# Validate a call-codex skill destination.
-# Flow: expand -> refuse symlink on expanded path -> canonicalize -> validate.
-# Args: raw_dest allow_outside(0|1) home
-# Sets PATH_SAFETY_EXPANDED_DEST and PATH_SAFETY_CANONICAL_DEST.
 path_safety_validate_dest() {
   local raw_dest="$1"
   local allow_outside="${2:-0}"
@@ -177,6 +205,10 @@ path_safety_validate_dest() {
   if path_safety_is_symlink "${expanded}"; then
     echo "error: refusing to use symlink destination: ${expanded}" >&2
     echo "error: remove or replace the symlink manually if this is intentional" >&2
+    return 1
+  fi
+
+  if ! path_safety_refuse_symlink_parents "${expanded}"; then
     return 1
   fi
 
@@ -207,20 +239,24 @@ path_safety_validate_dest() {
 }
 
 path_safety_print_uninstall_plan() {
-  local dest="$1"
-  local yes="${2:-0}"
+  local raw_dest="$1"
+  local expanded_dest="$2"
+  local canonical_dest="$3"
+  local yes="${4:-0}"
 
   echo "Uninstall plan"
   echo "--------------"
-  echo "Target path: ${dest}"
+  echo "Requested destination: ${raw_dest}"
+  echo "Expanded destination:  ${expanded_dest}"
+  echo "Canonical destination: ${canonical_dest}"
 
-  if [[ -e "${dest}" ]]; then
+  if [[ -e "${expanded_dest}" ]]; then
     echo "Exists: yes"
   else
     echo "Exists: no"
   fi
 
-  if [[ -L "${dest}" ]]; then
+  if [[ -L "${expanded_dest}" ]]; then
     echo "Is symlink: yes"
   else
     echo "Is symlink: no"

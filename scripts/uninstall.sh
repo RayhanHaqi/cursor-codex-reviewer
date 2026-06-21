@@ -72,7 +72,7 @@ if [[ ! -f "${OPERATIONAL_DEST}/SKILL.md" ]]; then
   exit 1
 fi
 
-path_safety_print_uninstall_plan "${OPERATIONAL_DEST}" "${YES}"
+path_safety_print_uninstall_plan "${DEST}" "${OPERATIONAL_DEST}" "${CANONICAL_DEST}" "${YES}"
 echo
 
 if [[ "${YES}" -eq 0 ]]; then
@@ -86,8 +86,10 @@ if [[ "${YES}" -eq 0 ]]; then
   esac
 fi
 
+path_safety_refuse_symlink_dest "${OPERATIONAL_DEST}" "remove"
+
 PARENT_DIR="$(dirname "${OPERATIONAL_DEST}")"
-rm -rf "${OPERATIONAL_DEST}"
+rm -rf -- "${OPERATIONAL_DEST}"
 
 if [[ -d "${PARENT_DIR}" ]]; then
   echo "Parent directory preserved: ${PARENT_DIR}"

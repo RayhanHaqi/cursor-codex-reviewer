@@ -6,7 +6,7 @@ Use Codex as a second-opinion reviewer in Cursor without granting write access b
 
 ## Status
 
-**Experimental / v0.1.1** — Safety and portability hardening release.
+**Experimental / v0.1.2** — Complete safety and portability integration.
 
 This project was extracted from a personal Cursor + Codex workflow and generalized for public use. Some integrations may require adaptation for your own local environment.
 
@@ -157,7 +157,7 @@ Codex operates in **read-only review mode** by default.
 - Requires explicit user approval of the exact command and sandbox change.
 - Prompt instructions alone do not technically prevent writes in this mode.
 
-The skill does not automatically source shell profiles. Launch Cursor with `codex` on `PATH`, or optionally set `CODEX_REVIEW_ENV_FILE` to an explicit environment file (see [`.env.example`](.env.example)).
+The skill does not source shell profiles or environment files automatically. Launch Cursor from an environment where `codex` is already on `PATH` and any required variables are configured.
 
 Full details: [`docs/safety-model.md`](docs/safety-model.md)
 

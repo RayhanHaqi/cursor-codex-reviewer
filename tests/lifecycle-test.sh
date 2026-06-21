@@ -195,6 +195,55 @@ else
 fi
 
 echo
+echo "Symlink parent safety tests"
+echo "---------------------------"
+
+SKILLS_PARENT="${HOME}/.cursor/skills"
+SKILLS_SYMLINK_TARGET="${TEST_ROOT}/skills-parent-target"
+SKILLS_PARENT_BACKUP="${TEST_ROOT}/skills-parent-backup"
+
+rm -rf "${SKILLS_SYMLINK_TARGET}" "${SKILLS_PARENT_BACKUP}"
+mkdir -p "${SKILLS_SYMLINK_TARGET}"
+if [[ -d "${SKILLS_PARENT}" ]]; then
+  mv "${SKILLS_PARENT}" "${SKILLS_PARENT_BACKUP}"
+fi
+ln -s "${SKILLS_SYMLINK_TARGET}" "${SKILLS_PARENT}"
+
+PARENT_SYMLINK_DEST="${SKILLS_PARENT}/call-codex"
+rm -rf "${PARENT_SYMLINK_DEST}"
+
+expect_failure "installer rejects destination under symlinked skills parent" \
+  bash "${INSTALL}" --dest "${PARENT_SYMLINK_DEST}"
+
+expect_failure "installer with --force rejects destination under symlinked skills parent" \
+  bash "${INSTALL}" --dest "${PARENT_SYMLINK_DEST}" --force
+
+if [[ ! -e "${PARENT_SYMLINK_DEST}" && ! -L "${PARENT_SYMLINK_DEST}" ]]; then
+  pass "symlinked skills parent remains without call-codex install"
+else
+  fail "symlinked skills parent remains without call-codex install"
+fi
+
+expect_failure "uninstaller rejects destination under symlinked skills parent" \
+  bash "${UNINSTALL}" --dest "${PARENT_SYMLINK_DEST}"
+
+expect_failure "uninstaller with --yes rejects destination under symlinked skills parent" \
+  bash "${UNINSTALL}" --dest "${PARENT_SYMLINK_DEST}" --yes
+
+rm -f "${SKILLS_PARENT}"
+if [[ -d "${SKILLS_PARENT_BACKUP}" ]]; then
+  mv "${SKILLS_PARENT_BACKUP}" "${SKILLS_PARENT}"
+else
+  mkdir -p "${SKILLS_PARENT}"
+fi
+
+if [[ -L "${SKILLS_PARENT}" ]]; then
+  fail "skills parent restored as a real directory after symlink parent tests"
+else
+  pass "skills parent restored as a real directory after symlink parent tests"
+fi
+
+echo
 echo "===================================="
 echo "Passed: ${PASS}"
 echo "Failed: ${FAIL}"
