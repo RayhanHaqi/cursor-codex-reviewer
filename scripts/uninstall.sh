@@ -1,21 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/path-safety.sh
+source "${SCRIPT_DIR}/lib/path-safety.sh"
+
 DEFAULT_DEST="${HOME}/.cursor/skills/call-codex"
 DEST="${DEFAULT_DEST}"
 YES=0
+ALLOW_OUTSIDE=0
 
 usage() {
   cat <<'EOF'
 Uninstall the call-codex Cursor skill.
 
 Usage:
-  ./scripts/uninstall.sh [--dest PATH] [--yes]
+  ./scripts/uninstall.sh [--dest PATH] [--yes] [--allow-custom-outside-cursor-skills]
 
 Options:
-  --dest PATH   Custom skill destination (default: ~/.cursor/skills/call-codex)
-  --yes         Skip confirmation prompt
-  -h, --help    Show this help message
+  --dest PATH                              Custom skill destination (default: ~/.cursor/skills/call-codex)
+  --yes                                    Skip confirmation prompt
+  --allow-custom-outside-cursor-skills     Allow destinations outside ~/.cursor/skills/
+  -h, --help                               Show this help message
 EOF
 }
 
@@ -30,6 +36,10 @@ while [[ $# -gt 0 ]]; do
       YES=1
       shift
       ;;
+    --allow-custom-outside-cursor-skills)
+      ALLOW_OUTSIDE=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -42,26 +52,21 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Safety: refuse to delete paths that are too broad.
-case "${DEST}" in
-  ""|"/"|"${HOME}"|"${HOME}/.cursor"|"${HOME}/.cursor/skills")
-    echo "error: refusing to delete unsafe path: ${DEST}" >&2
-    exit 1
-    ;;
-esac
+CANONICAL_DEST="$(path_safety_validate_dest "${DEST}" "${ALLOW_OUTSIDE}" "${HOME}")"
 
-if [[ ! -e "${DEST}" ]]; then
-  echo "Nothing to uninstall. Path does not exist: ${DEST}"
+if [[ ! -e "${CANONICAL_DEST}" ]]; then
+  echo "Nothing to uninstall. Path does not exist: ${CANONICAL_DEST}"
   exit 0
 fi
 
-if [[ ! -f "${DEST}/SKILL.md" ]]; then
-  echo "error: ${DEST} does not look like a call-codex skill directory (missing SKILL.md)" >&2
+path_safety_refuse_symlink_dest "${CANONICAL_DEST}"
+
+if [[ ! -f "${CANONICAL_DEST}/SKILL.md" ]]; then
+  echo "error: ${CANONICAL_DEST} does not look like a call-codex skill directory (missing SKILL.md)" >&2
   exit 1
 fi
 
-echo "The following directory will be deleted:"
-echo "  ${DEST}"
+path_safety_print_uninstall_plan "${CANONICAL_DEST}" "${YES}"
 echo
 
 if [[ "${YES}" -eq 0 ]]; then
@@ -75,5 +80,11 @@ if [[ "${YES}" -eq 0 ]]; then
   esac
 fi
 
-rm -rf "${DEST}"
-echo "Removed: ${DEST}"
+PARENT_DIR="$(dirname "${CANONICAL_DEST}")"
+rm -rf "${CANONICAL_DEST}"
+
+if [[ -d "${PARENT_DIR}" ]]; then
+  echo "Parent directory preserved: ${PARENT_DIR}"
+fi
+
+echo "Removed: ${CANONICAL_DEST}"

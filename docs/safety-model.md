@@ -4,23 +4,72 @@
 
 1. **Read-only by default** — Codex runs with `-s read-only` unless sandbox failure requires an explicit user-approved fallback.
 2. **Explicit approval gates** — No Codex execution without user confirmation.
-3. **Instructional enforcement** — Even with `workspace-write`, Codex is instructed not to edit files.
-4. **User responsibility** — The user decides whether to act on findings.
+3. **Technical containment first** — Read-only sandbox restricts workspace mutation where supported.
+4. **User responsibility** — The user decides whether to act on findings and what data to send.
 5. **Second opinion, not truth** — LLM review can be wrong; findings must be verified.
 
-## Default sandbox
+## Data boundary and privacy
+
+Data boundary: `/call-codex` may send selected repository context, diffs, plans, task descriptions, and logs to Codex. Review the generated prompt before approval. Do not use the skill with confidential code or sensitive data unless your organization's policy and your Codex account configuration permit it.
+
+- Prompt context should be minimized by default.
+- Full repository diffs should not be included blindly.
+- Users should approve the generated prompt before Codex runs.
+- Sensitive files should be excluded by default where practical.
+
+Default sensitive-path exclusions during prompt gathering:
+
+```text
+.env
+.env.*
+*.pem
+*.key
+id_rsa
+id_ed25519
+credentials*
+secrets*
+node_modules/
+vendor/
+dist/
+build/
+```
+
+This exclusion list does not guarantee sensitive data cannot be sent.
+
+Review prompts are written to unique private temporary files (`mktemp` + `chmod 600`) and cleaned up automatically unless the user explicitly opts to keep them for debugging.
+
+## Sandbox modes
+
+### Default mode: Read-only containment
+
+Meaning:
+
+- Codex runs with a read-only sandbox where supported.
+- Codex is instructed to review only.
+- Workspace mutation is technically restricted by sandbox configuration.
 
 Preferred invocation:
 
 ```bash
-codex -m <model> -c model_reasoning_effort="<effort>" -s read-only -a untrusted -C "$PWD" exec - < <prompt-file>
+PROMPT_FILE="$(mktemp "${TMPDIR:-/tmp}/codex-review.XXXXXX.md")"
+chmod 600 "${PROMPT_FILE}"
+trap 'rm -f "${PROMPT_FILE}"' EXIT
+
+codex -m <model> -c model_reasoning_effort="<effort>" -s read-only -a untrusted -C "$PWD" exec - < "${PROMPT_FILE}"
 ```
 
 - `-s read-only`: model-generated shell commands run in a read-only sandbox.
 - `-a untrusted`: only trusted commands run without prompting.
 - `-C "$PWD"`: review is scoped to the working directory.
 
-## Write-enabled fallback
+### Fallback mode: Degraded containment fallback
+
+Meaning:
+
+- This mode may technically allow workspace modification.
+- Codex must still be instructed not to edit files.
+- The user must explicitly approve the exact command and sandbox change.
+- The user must see a warning that write prevention is no longer technically enforced.
 
 If read-only sandbox fails (e.g. bubblewrap/user-namespace issues on some Linux setups), the skill may propose:
 
@@ -28,9 +77,33 @@ If read-only sandbox fails (e.g. bubblewrap/user-namespace issues on some Linux 
 codex ... -s workspace-write ...
 ```
 
-This requires explicit user approval. Codex must still be instructed to behave as a read-only reviewer.
+This requires explicit user approval. Do not silently switch sandbox modes.
+
+The approval request for fallback must include:
+
+1. Why read-only mode could not be used.
+2. The exact command to be executed.
+3. The exact sandbox mode change.
+4. This exact warning:
+
+```text
+This fallback weakens technical write protection. Codex is instructed not to edit files, but the environment may permit workspace changes.
+```
+
+5. A clear cancel option.
+
+Prompt instructions alone do **not** technically prevent writes in `workspace-write` mode.
 
 `danger-full-access` is never used by default.
+
+## Environment configuration
+
+The skill does **not** automatically source shell profiles (`.bashrc`, `.zshrc`, `.profile`, etc.).
+
+Safer alternatives:
+
+1. Launch Cursor from an environment where `codex` is already available.
+2. Optionally set `CODEX_REVIEW_ENV_FILE` to an explicitly configured environment file. The skill sources only that file when set. It may contain sensitive variables and is never auto-discovered.
 
 ## Categories of risky actions
 
@@ -82,6 +155,7 @@ Review feedback may suggest dependency upgrades or schema migrations. These are 
 The user must:
 
 - approve Codex execution and sandbox mode
+- review the generated prompt before sending data to Codex
 - review findings critically
 - run meaningful verification
 - decide what changes to implement
@@ -92,7 +166,7 @@ Sandboxing reduces risk but does not eliminate it:
 
 - read-only review can still read sensitive files if they are in scope
 - instructions may be misinterpreted
-- `workspace-write` increases blast radius
+- `workspace-write` weakens technical write protection even when Codex is instructed not to edit
 - sandbox behavior depends on Codex CLI version and OS configuration
 
 ## Limitations of LLM review

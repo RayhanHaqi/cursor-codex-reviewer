@@ -18,6 +18,64 @@ Do not run expensive, destructive, long-running, or state-changing commands with
 
 Treat Codex output as a second opinion, not a guaranteed truth source.
 
+## Data boundary and privacy
+
+Data boundary: `/call-codex` may send selected repository context, diffs, plans, task descriptions, and logs to Codex. Review the generated prompt before approval. Do not use the skill with confidential code or sensitive data unless your organization's policy and your Codex account configuration permit it.
+
+- Minimize prompt context by default.
+- Do not include full repository diffs blindly.
+- Show the user the prepared prompt summary and path before Codex runs.
+- Exclude sensitive files from prompt gathering where practical.
+
+Default sensitive-path exclusions (never paste contents; omit from lists when obvious):
+
+```text
+.env
+.env.*
+*.pem
+*.key
+id_rsa
+id_ed25519
+credentials*
+secrets*
+node_modules/
+vendor/
+dist/
+build/
+```
+
+This exclusion list does not guarantee sensitive data cannot be sent. The user must review the generated prompt before approval.
+
+## Sandbox modes
+
+### Default mode: Read-only containment
+
+- Codex runs with `-s read-only` where supported.
+- Codex is instructed to review only.
+- Workspace mutation is technically restricted by sandbox configuration.
+
+### Fallback mode: Degraded containment fallback
+
+- This mode may technically allow workspace modification.
+- Codex must still be instructed not to edit files.
+- The user must explicitly approve the exact command and sandbox change.
+- The user must see a warning that write prevention is no longer technically enforced.
+
+Do not silently switch from read-only to `workspace-write`.
+
+When proposing fallback, the approval request must include:
+
+1. Why read-only mode could not be used.
+2. The exact command to be executed.
+3. The exact sandbox mode change (`-s read-only` → `-s workspace-write`).
+4. This exact warning:
+
+```text
+This fallback weakens technical write protection. Codex is instructed not to edit files, but the environment may permit workspace changes.
+```
+
+5. A clear cancel option.
+
 ## When to use
 
 Use this skill for:
@@ -70,7 +128,7 @@ Required popup title:
 Required options:
 
 1. `Run Codex now`
-   - Write the prompt file (see Prompt file location).
+   - Write the prompt file (see Prompt file handling).
    - Run the prepared Codex command.
    - Preserve the selected model/effort and sandbox mode.
    - Keep read-only mode unless the user explicitly selected/approved write mode.
@@ -289,11 +347,13 @@ Build a deduplicated list:
 
 **Exclude from the bundle** (never paste contents; omit from lists when obvious):
 
-- secrets / `.env*` / credentials / API keys
-- `node_modules/`, `__pycache__/`, `.venv/`, `venv/`, `.git/`
+- `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `credentials*`, `secrets*`
+- `node_modules/`, `vendor/`, `dist/`, `build/`, `__pycache__/`, `.venv/`, `venv/`, `.git/`
 - datasets, checkpoints, model weights
 - large binaries, images, caches, generated outputs, report PDFs
 - artifact directories unless the task is explicitly about them
+
+This exclusion list does not guarantee sensitive data cannot be sent.
 
 For **A) Deep**, add a one-line note per changed file when helpful. Do not paste large snippets; prefer `git diff --stat` plus at most a few small hunks if critical.
 
@@ -354,7 +414,7 @@ Verification context:
    - known risks
    - exact question for Codex
 
-3. Write the prompt to a temp file (see Prompt file location).
+3. Create a private per-invocation prompt file (see Prompt file handling). Show the user the prompt summary and file path before asking to run Codex.
 
 4. Inspect local Codex command syntax if needed:
    `codex exec --help`
@@ -372,24 +432,49 @@ Verification context:
 
 8. If approved, run Codex in non-interactive mode using the local CLI-supported syntax.
 
+   Create and clean up the prompt file safely:
+
+   ```bash
+   PROMPT_FILE="$(mktemp "${TMPDIR:-/tmp}/codex-review.XXXXXX.md")"
+   chmod 600 "${PROMPT_FILE}"
+   # write the prepared prompt to "${PROMPT_FILE}"
+   trap 'rm -f "${PROMPT_FILE}"' EXIT
+   ```
+
+   Unless the user explicitly chose `--keep-prompt` (or equivalent approval to preserve the file for debugging), register cleanup so the prompt file is removed after Codex completes, errors, or the workflow exits.
+
    Preferred command pattern (adapt model and effort to the user's environment):
 
    ```bash
-   codex -m <model> -c model_reasoning_effort="<selected-effort>" -s read-only -a untrusted -C "$PWD" exec - < <prompt-file>
+   codex -m <model> -c model_reasoning_effort="<selected-effort>" -s read-only -a untrusted -C "$PWD" exec - < "${PROMPT_FILE}"
    ```
 
    Replace `<model>` with an available Codex model (e.g. the user's configured default).
    Replace `<selected-effort>` with exactly one value appropriate for the chosen depth (e.g. `medium`, `high`, or `xhigh`).
 
-   If optional environment setup is needed (e.g. loading integration API keys from the user's shell profile), source the user's shell profile non-interactively before `exec codex`, but never print secrets.
+   Do not automatically source `.bashrc`, `.zshrc`, `.profile`, `.bash_profile`, or equivalent shell configuration.
 
-   If `-s read-only` fails because of local bubblewrap/user-namespace sandbox issues, ask the user before using this fallback:
+   Environment setup alternatives:
+
+   1. Launch Cursor from an environment where `codex` is already on `PATH` and any needed variables are already exported.
+   2. Optionally, if the user has explicitly configured `CODEX_REVIEW_ENV_FILE`, source only that file in the same shell before `exec codex`:
 
    ```bash
-   codex -m <model> -c model_reasoning_effort="<selected-effort>" -s workspace-write -a untrusted -C "$PWD" exec - < <prompt-file>
+   if [[ -n "${CODEX_REVIEW_ENV_FILE:-}" && -r "${CODEX_REVIEW_ENV_FILE}" ]]; then
+     # shellcheck disable=SC1090
+     source "${CODEX_REVIEW_ENV_FILE}"
+   fi
    ```
 
-   Even with `workspace-write`, Codex must remain read-only by instruction. Do not use `danger-full-access` or bypass sandbox unless the user explicitly approves for a disposable test.
+   Never auto-discover environment files. Never print secrets. `CODEX_REVIEW_ENV_FILE` may contain sensitive variables.
+
+   If `-s read-only` fails because of local bubblewrap/user-namespace sandbox issues, do not switch silently. Ask the user using the **Degraded containment fallback** approval requirements (see Sandbox modes) before using:
+
+   ```bash
+   codex -m <model> -c model_reasoning_effort="<selected-effort>" -s workspace-write -a untrusted -C "$PWD" exec - < "${PROMPT_FILE}"
+   ```
+
+   Even with `workspace-write`, Codex must remain read-only by instruction, but technical write protection is weakened. Do not use `danger-full-access` or bypass sandbox unless the user explicitly approves for a disposable test.
 
    If the installed Codex CLI requires different syntax, use `codex exec --help` and adapt. Do not guess silently.
 
@@ -403,15 +488,33 @@ Verification context:
 
 11. Ask the user before changing the plan or editing files.
 
-## Prompt file location
+## Prompt file handling
 
-Default:
+Do not use predictable fixed filenames such as `/tmp/codex-review-prompt.md`.
 
-```text
-/tmp/codex-review-prompt.md
+For each invocation:
+
+```bash
+PROMPT_FILE="$(mktemp "${TMPDIR:-/tmp}/codex-review.XXXXXX.md")"
+chmod 600 "${PROMPT_FILE}"
+trap 'rm -f "${PROMPT_FILE}"' EXIT
 ```
 
-Use a workspace-local path only if `/tmp` is unavailable or the user requests it.
+Requirements:
+
+1. Unique temporary file per invocation.
+2. Restrictive permissions (`chmod 600`).
+3. Automatic cleanup after Codex completes, errors, or workflow exit.
+4. No predictable fixed filenames.
+5. Do not leave repository context, diffs, or logs in shared temporary directories by default.
+
+The user must be able to inspect the prepared prompt (summary and/or file path) before approving Codex execution.
+
+Optional preservation for debugging:
+
+- If the user explicitly requests `--keep-prompt` (or chooses an equivalent popup option), skip the cleanup trap.
+- Document that preserved prompt files may contain sensitive repository context.
+- Never include secrets, `.env` contents, credentials, or known sensitive files in the generated prompt.
 
 ## Codex prompt template
 

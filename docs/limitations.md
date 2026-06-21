@@ -1,6 +1,6 @@
 # Limitations
 
-This project is **experimental (v0.1.0)**. Understand these limitations before relying on it.
+This project is **experimental (v0.1.1)**. Understand these limitations before relying on it.
 
 ## Review quality
 
@@ -54,6 +54,12 @@ The structured review format may evolve in future releases. Downstream automatio
 ## Sandboxing
 
 Read-only sandboxing depends on OS-level features. Some environments may require `workspace-write` fallback, which increases risk even when Codex is instructed not to edit files.
+
+## Data boundary
+
+- `/call-codex` may transmit repository context, diffs, plans, and logs to Codex when approved.
+- Sensitive-path exclusions reduce risk but do not guarantee sensitive data cannot be sent.
+- Users must review the generated prompt before approval.
 
 ## Scope of this repository
 

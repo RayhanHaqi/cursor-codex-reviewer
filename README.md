@@ -6,7 +6,7 @@ Use Codex as a second-opinion reviewer in Cursor without granting write access b
 
 ## Status
 
-**Experimental / v0.1.0** — Experimental public release.
+**Experimental / v0.1.1** — Safety and portability hardening release.
 
 This project was extracted from a personal Cursor + Codex workflow and generalized for public use. Some integrations may require adaptation for your own local environment.
 
@@ -83,7 +83,7 @@ cd cursor-codex-reviewer
 ./scripts/doctor.sh
 ```
 
-Custom install path:
+Custom install path (must end with `/call-codex`):
 
 ```bash
 ./scripts/install.sh --dest ~/.cursor/skills/call-codex
@@ -95,11 +95,20 @@ Overwrite existing install:
 ./scripts/install.sh --force
 ```
 
+Custom path outside `~/.cursor/skills/` (explicit opt-in):
+
+```bash
+./scripts/install.sh --dest /custom/path/call-codex --allow-custom-outside-cursor-skills
+```
+
 Uninstall:
 
 ```bash
 ./scripts/uninstall.sh
+./scripts/uninstall.sh --yes
 ```
+
+The installer and uninstaller validate destinations and refuse unsafe paths such as `/`, `$HOME`, or `$HOME/.cursor/skills`.
 
 ## Usage examples
 
@@ -123,14 +132,32 @@ Workflow-only (prepare prompt without running Codex):
 
 See [`examples/`](examples/) for realistic interactions.
 
+## Data boundary and privacy
+
+Data boundary: `/call-codex` may send selected repository context, diffs, plans, task descriptions, and logs to Codex. Review the generated prompt before approval. Do not use the skill with confidential code or sensitive data unless your organization's policy and your Codex account configuration permit it.
+
+- Prompt context is minimized by default.
+- Full repository diffs are not included blindly.
+- Review prompts use private per-invocation temporary files (`mktemp`, `chmod 600`) with automatic cleanup.
+- Sensitive paths (`.env`, keys, credentials, build artifacts) are excluded from gathering where practical. This does not guarantee sensitive data cannot be sent.
+
 ## Safety model
 
 Codex operates in **read-only review mode** by default.
 
-- Preferred sandbox: `-s read-only -a untrusted`
-- `workspace-write` fallback requires explicit user approval
-- Codex must not commit, push, delete, migrate, or upgrade dependencies without approval
-- Expensive or long-running commands require approval
+### Default mode: Read-only containment
+
+- Codex runs with `-s read-only` where supported.
+- Codex is instructed to review only.
+- Workspace mutation is technically restricted by sandbox configuration.
+
+### Fallback mode: Degraded containment fallback
+
+- May technically allow workspace modification (`-s workspace-write`).
+- Requires explicit user approval of the exact command and sandbox change.
+- Prompt instructions alone do not technically prevent writes in this mode.
+
+The skill does not automatically source shell profiles. Launch Cursor with `codex` on `PATH`, or optionally set `CODEX_REVIEW_ENV_FILE` to an explicit environment file (see [`.env.example`](.env.example)).
 
 Full details: [`docs/safety-model.md`](docs/safety-model.md)
 
@@ -172,10 +199,14 @@ cursor-codex-reviewer/
 ├── scripts/
 │   ├── install.sh
 │   ├── uninstall.sh
-│   └── doctor.sh
+│   ├── doctor.sh
+│   └── lib/path-safety.sh
 ├── examples/                       # Usage examples
 ├── docs/                           # Design, safety, limitations
-└── tests/smoke-test.sh
+├── .github/workflows/ci.yml
+└── tests/
+    ├── smoke-test.sh
+    └── lifecycle-test.sh
 ```
 
 ## Limitations
@@ -198,6 +229,15 @@ Other limitations:
 
 Full list: [`docs/limitations.md`](docs/limitations.md)
 
+## Compatibility
+
+- Tested primarily on Linux and macOS shell environments.
+- Cursor desktop and Cursor CLI may expose different interaction capabilities.
+- Popup/approval UI behavior depends on Cursor environment and version.
+- Codex CLI command syntax and sandbox features may vary by version.
+- Run `./scripts/doctor.sh` after installation.
+- This project is experimental and may require local adaptation.
+
 ## Troubleshooting
 
 ```bash
@@ -205,6 +245,29 @@ Full list: [`docs/limitations.md`](docs/limitations.md)
 ```
 
 Common issues: [`docs/troubleshooting.md`](docs/troubleshooting.md)
+
+## GitHub metadata (maintainers)
+
+Recommended repository description:
+
+```text
+Read-only Codex second-opinion reviewer skill for Cursor, with approval gates and structured review output.
+```
+
+Suggested topics:
+
+```text
+cursor
+codex
+openai-codex
+ai-agents
+coding-agents
+code-review
+cursor-skill
+developer-tools
+llm
+agent-workflow
+```
 
 ## Contributing
 

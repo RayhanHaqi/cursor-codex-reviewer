@@ -1,5 +1,14 @@
 # Troubleshooting
 
+## Compatibility notes
+
+- This project is tested primarily on Linux and macOS shell environments.
+- Cursor desktop and Cursor CLI may expose different interaction capabilities.
+- Popup/approval UI behavior depends on Cursor environment and version.
+- Codex CLI command syntax and sandbox features may vary by version.
+- Run `./scripts/doctor.sh` after installation.
+- The project is experimental and may require local adaptation.
+
 ## Quick diagnosis
 
 Run:
@@ -128,6 +137,25 @@ The skill assumes bash-style command examples for Codex invocation.
 **Symptom:** `-s read-only` errors on Linux.
 
 **Fix:**
-1. Approve `workspace-write` fallback only if you understand the increased risk.
+1. Approve **Degraded containment fallback** (`workspace-write`) only after reading the exact warning that technical write protection is weakened.
 2. Check Codex sandbox documentation for your OS (bubblewrap, user namespaces).
 3. Do not use `danger-full-access` unless in a disposable environment with explicit approval.
+
+## Installer refuses destination path
+
+**Symptom:** `install.sh` or `uninstall.sh` rejects the destination.
+
+**Fix:**
+1. Ensure the destination basename is exactly `call-codex`.
+2. Use the default path `~/.cursor/skills/call-codex` when possible.
+3. For custom paths outside `~/.cursor/skills/`, pass `--allow-custom-outside-cursor-skills`.
+4. Do not target `/`, `$HOME`, `$HOME/.cursor`, or `$HOME/.cursor/skills`.
+
+## Shell profile / environment variables
+
+**Symptom:** Codex cannot find credentials or optional integration variables.
+
+**Fix:**
+1. Launch Cursor from a shell where `codex` is already on `PATH`.
+2. Optionally set `CODEX_REVIEW_ENV_FILE` to a private environment file (see `.env.example`).
+3. Do not rely on automatic `.bashrc` / `.zshrc` sourcing — it is intentionally disabled.

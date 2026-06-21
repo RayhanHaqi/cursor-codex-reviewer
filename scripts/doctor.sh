@@ -112,10 +112,14 @@ else
   note "No ~/.cursor/mcp.json found. Core review still works; optional MCP integrations are unavailable."
 fi
 
-if declare -F load_context7_key >/dev/null 2>&1; then
-  note "Optional shell helper 'load_context7_key' is defined. Context7 integration may work if configured."
+if [[ -n "${CODEX_REVIEW_ENV_FILE:-}" ]]; then
+  if [[ -r "${CODEX_REVIEW_ENV_FILE}" ]]; then
+    note "CODEX_REVIEW_ENV_FILE is set and readable. Optional environment variables may be loaded explicitly."
+  else
+    warn "CODEX_REVIEW_ENV_FILE is set but not readable: ${CODEX_REVIEW_ENV_FILE}"
+  fi
 else
-  note "Optional shell helper 'load_context7_key' not found. Context7 is optional; core review still works."
+  note "CODEX_REVIEW_ENV_FILE is not set. This is normal; launch Cursor with codex on PATH or configure an explicit env file."
 fi
 
 echo

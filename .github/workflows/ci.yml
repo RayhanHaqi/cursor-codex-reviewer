@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Validate shell syntax
+        run: |
+          bash -n scripts/*.sh
+          bash -n tests/*.sh
+
+      - name: Run ShellCheck
+        run: |
+          shellcheck scripts/*.sh tests/*.sh
+          shellcheck scripts/lib/path-safety.sh
+
+      - name: Run smoke tests
+        run: ./tests/smoke-test.sh
+
+      - name: Run lifecycle tests
+        run: ./tests/lifecycle-test.sh
