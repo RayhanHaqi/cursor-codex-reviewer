@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DEFAULT_SKILL_PATH="${HOME}/.cursor/skills/call-codex"
+SKILL_PATH="${DEFAULT_SKILL_PATH}"
+ERRORS=0
+WARNINGS=0
+NOTES=0
+
+usage() {
+  cat <<'EOF'
+Diagnose call-codex setup.
+
+Usage:
+  ./scripts/doctor.sh [--skill-path PATH]
+
+Options:
+  --skill-path PATH   Custom installed skill path
+  -h, --help          Show this help message
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skill-path)
+      [[ $# -ge 2 ]] || { echo "error: --skill-path requires a path" >&2; exit 1; }
+      SKILL_PATH="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+note() {
+  echo "NOTE: $*"
+  NOTES=$((NOTES + 1))
+}
+
+warn() {
+  echo "WARNING: $*" >&2
+  WARNINGS=$((WARNINGS + 1))
+}
+
+error() {
+  echo "ERROR: $*" >&2
+  ERRORS=$((ERRORS + 1))
+}
+
+version_of() {
+  local cmd="$1"
+  if command -v "${cmd}" >/dev/null 2>&1; then
+    "${cmd}" --version 2>/dev/null || "${cmd}" -V 2>/dev/null || echo "available (version unknown)"
+  else
+    echo "not found"
+  fi
+}
+
+echo "cursor-codex-reviewer doctor"
+echo "=============================="
+echo
+
+# Cursor CLI (optional — many users only use the desktop app)
+if command -v cursor >/dev/null 2>&1; then
+  echo "cursor: $(version_of cursor)"
+else
+  note "cursor CLI not found in PATH. The desktop app may still work; this is not blocking."
+fi
+
+# Codex CLI (blocking for actual review runs)
+if command -v codex >/dev/null 2>&1; then
+  echo "codex:  $(version_of codex)"
+  if ! codex exec --help >/dev/null 2>&1; then
+    warn "codex is installed but 'codex exec --help' failed. Command syntax may differ from this skill."
+  fi
+else
+  error "codex CLI not found in PATH. Install and authenticate Codex before using /call-codex."
+fi
+
+echo
+
+# Installed skill
+if [[ -d "${SKILL_PATH}" ]]; then
+  echo "skill:  installed at ${SKILL_PATH}"
+else
+  error "call-codex skill not found at ${SKILL_PATH}. Run ./scripts/install.sh"
+fi
+
+if [[ -f "${SKILL_PATH}/SKILL.md" ]]; then
+  if [[ -r "${SKILL_PATH}/SKILL.md" ]]; then
+    echo "skill file: readable (${SKILL_PATH}/SKILL.md)"
+  else
+    error "SKILL.md exists but is not readable: ${SKILL_PATH}/SKILL.md"
+  fi
+else
+  error "SKILL.md missing in ${SKILL_PATH}"
+fi
+
+echo
+
+# Optional integrations
+if [[ -f "${HOME}/.cursor/mcp.json" ]]; then
+  note "Cursor MCP config found at ~/.cursor/mcp.json. Optional integrations may be available."
+else
+  note "No ~/.cursor/mcp.json found. Core review still works; optional MCP integrations are unavailable."
+fi
+
+if declare -F load_context7_key >/dev/null 2>&1; then
+  note "Optional shell helper 'load_context7_key' is defined. Context7 integration may work if configured."
+else
+  note "Optional shell helper 'load_context7_key' not found. Context7 is optional; core review still works."
+fi
+
+echo
+echo "Summary"
+echo "-------"
+echo "Blocking errors: ${ERRORS}"
+echo "Warnings:        ${WARNINGS}"
+echo "Optional notes:  ${NOTES}"
+
+if [[ "${ERRORS}" -gt 0 ]]; then
+  echo
+  echo "Result: FAIL — fix blocking errors before using /call-codex."
+  exit 1
+fi
+
+if [[ "${WARNINGS}" -gt 0 ]]; then
+  echo
+  echo "Result: PASS WITH WARNINGS"
+  exit 0
+fi
+
+echo
+echo "Result: PASS"
+exit 0
