@@ -77,7 +77,7 @@ Compatibility with all Cursor versions, Codex versions, operating systems, shell
 ## Installation
 
 ```bash
-git clone https://github.com/<YOUR_GITHUB_USER>/cursor-codex-reviewer.git
+git clone https://github.com/RayhanHaqi/cursor-codex-reviewer.git
 cd cursor-codex-reviewer
 ./scripts/install.sh
 ./scripts/doctor.sh
