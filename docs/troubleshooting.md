@@ -141,6 +141,28 @@ The skill assumes bash-style command examples for Codex invocation.
 2. Check Codex sandbox documentation for your OS (bubblewrap, user namespaces).
 3. Do not use `danger-full-access` unless in a disposable environment with explicit approval.
 
+## Symlink destinations refused
+
+**Symptom:** Install or uninstall fails with `refusing to modify symlink destination` or `refusing to remove symlink destination`.
+
+**Note:** Install and uninstall refuse symlink destinations by design. They check the expanded destination path for symlinks before canonicalization and never follow symlink targets.
+
+**Fix:**
+1. Remove or replace the symlink manually if you intentionally symlinked the skill directory.
+2. Install directly to a real directory named `call-codex`.
+3. Use the default path `~/.cursor/skills/call-codex` when possible.
+
+## Path canonicalization unavailable
+
+**Symptom:** `could not canonicalize destination path safely`.
+
+**Note:** Path normalization may depend on standard tools such as `realpath`, `readlink`, or Python 3. Behavior can vary between Linux and macOS.
+
+**Fix:**
+1. Ensure `realpath` or Python 3 is available on your system.
+2. Use an absolute or `~`-expanded destination path.
+3. Create parent directories before custom installs when needed.
+
 ## Installer refuses destination path
 
 **Symptom:** `install.sh` or `uninstall.sh` rejects the destination.

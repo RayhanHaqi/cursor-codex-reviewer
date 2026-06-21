@@ -59,26 +59,33 @@ if [[ ! -f "${SKILL_SOURCE}/SKILL.md" ]]; then
   exit 1
 fi
 
-CANONICAL_DEST="$(path_safety_validate_dest "${DEST}" "${ALLOW_OUTSIDE}" "${HOME}")"
+EXPANDED_DEST="$(path_safety_expand_path "${DEST}")"
+path_safety_refuse_symlink_dest "${EXPANDED_DEST}" "modify"
 
-if [[ -e "${CANONICAL_DEST}" ]]; then
-  path_safety_refuse_symlink_dest "${CANONICAL_DEST}"
+if ! path_safety_validate_dest "${DEST}" "${ALLOW_OUTSIDE}" "${HOME}"; then
+  exit 1
+fi
 
+CANONICAL_DEST="${PATH_SAFETY_CANONICAL_DEST}"
+OPERATIONAL_DEST="${PATH_SAFETY_EXPANDED_DEST}"
+
+if [[ -e "${OPERATIONAL_DEST}" ]]; then
   if [[ "${FORCE}" -eq 0 ]]; then
-    echo "error: destination already exists: ${CANONICAL_DEST}" >&2
+    echo "error: destination already exists: ${OPERATIONAL_DEST}" >&2
     echo "Use --force to overwrite." >&2
     exit 1
   fi
 
-  echo "Replacing existing installation at canonical destination:"
-  echo "  ${CANONICAL_DEST}"
-  rm -rf "${CANONICAL_DEST}"
+  echo "Replacing existing installation at:"
+  echo "  expanded:   ${OPERATIONAL_DEST}"
+  echo "  canonical:  ${CANONICAL_DEST}"
+  rm -rf "${OPERATIONAL_DEST}"
 fi
 
-mkdir -p "${CANONICAL_DEST}"
-cp -a "${SKILL_SOURCE}/." "${CANONICAL_DEST}/"
+mkdir -p "${OPERATIONAL_DEST}"
+cp -a "${SKILL_SOURCE}/." "${OPERATIONAL_DEST}/"
 
-echo "Installed call-codex skill to: ${CANONICAL_DEST}"
+echo "Installed call-codex skill to: ${OPERATIONAL_DEST}"
 echo
 echo "Next steps:"
 echo "  1. Restart Cursor or reload skills if needed."

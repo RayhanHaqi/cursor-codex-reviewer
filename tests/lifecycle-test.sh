@@ -151,6 +151,50 @@ else
 fi
 
 echo
+echo "Symlink safety tests"
+echo "--------------------"
+
+SYMLINK_DEST="${HOME}/.cursor/skills/call-codex"
+SYMLINK_TARGET="${TEST_ROOT}/symlink-target"
+MARKER_FILE="${SYMLINK_TARGET}/preserve-me.txt"
+
+mkdir -p "${HOME}/.cursor/skills"
+rm -rf "${SYMLINK_DEST}"
+mkdir -p "${SYMLINK_TARGET}"
+printf 'preserve\n' > "${MARKER_FILE}"
+ln -s "${SYMLINK_TARGET}" "${SYMLINK_DEST}"
+
+expect_failure "installer rejects symlink destination" \
+  bash "${INSTALL}" --dest "${SYMLINK_DEST}"
+
+expect_failure "installer with --force rejects symlink destination" \
+  bash "${INSTALL}" --dest "${SYMLINK_DEST}" --force
+
+if [[ -f "${MARKER_FILE}" ]] && [[ -L "${SYMLINK_DEST}" ]]; then
+  pass "symlink target remains untouched after rejected install attempts"
+else
+  fail "symlink target remains untouched after rejected install attempts"
+fi
+
+expect_failure "uninstaller rejects symlink destination" \
+  bash "${UNINSTALL}" --dest "${SYMLINK_DEST}"
+
+expect_failure "uninstaller with --yes rejects symlink destination" \
+  bash "${UNINSTALL}" --dest "${SYMLINK_DEST}" --yes
+
+if [[ -f "${MARKER_FILE}" ]] && [[ -L "${SYMLINK_DEST}" ]]; then
+  pass "symlink target remains untouched after rejected uninstall attempts"
+else
+  fail "symlink target remains untouched after rejected uninstall attempts"
+fi
+
+if [[ -d "${HOME}/.cursor/skills" ]]; then
+  pass "parent directory remains intact after symlink rejection tests"
+else
+  fail "parent directory remains intact after symlink rejection tests"
+fi
+
+echo
 echo "===================================="
 echo "Passed: ${PASS}"
 echo "Failed: ${FAIL}"

@@ -135,6 +135,11 @@ UNINSTALL_FILE="${REPO_ROOT}/scripts/uninstall.sh"
 require_grep "${INSTALL_FILE}" "path_safety_validate_dest" "installer uses dangerous path checks"
 require_grep "${UNINSTALL_FILE}" "path_safety_validate_dest" "uninstaller uses dangerous path checks"
 require_grep "${INSTALL_FILE}" "allow-custom-outside-cursor-skills" "installer contains custom outside-root opt-in flag"
+require_grep "${REPO_ROOT}/scripts/lib/path-safety.sh" "path_safety_refuse_symlink_dest" "path safety includes symlink rejection helper"
+require_grep "${REPO_ROOT}/scripts/lib/path-safety.sh" "path_safety_canonicalize_non_symlink_path" "path safety canonicalizes only after symlink check"
+require_grep "${REPO_ROOT}/tests/lifecycle-test.sh" "Symlink safety tests" "lifecycle test includes symlink coverage"
+require_grep "${INSTALL_FILE}" "path_safety_refuse_symlink_dest" "installer references symlink-safe validation"
+require_grep "${UNINSTALL_FILE}" "path_safety_refuse_symlink_dest" "uninstaller references symlink-safe validation"
 
 echo
 echo "================================="

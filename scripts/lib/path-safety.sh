@@ -4,7 +4,11 @@
 
 SKILL_BASENAME="call-codex"
 
-path_safety_expand_tilde() {
+# Set by path_safety_validate_dest.
+PATH_SAFETY_EXPANDED_DEST=""
+PATH_SAFETY_CANONICAL_DEST=""
+
+path_safety_expand_path() {
   local path="$1"
   case "${path}" in
     "~")
@@ -19,11 +23,40 @@ path_safety_expand_tilde() {
   esac
 }
 
-path_safety_canonical_dest() {
-  local raw="$1"
-  local expanded resolved parent base
+# Backward-compatible alias.
+path_safety_expand_tilde() {
+  path_safety_expand_path "$1"
+}
 
-  expanded="$(path_safety_expand_tilde "${raw}")"
+path_safety_is_symlink() {
+  [[ -L "$1" ]]
+}
+
+# Reject symlink destinations before canonicalization.
+# Args: expanded_path operation(modify|remove)
+path_safety_refuse_symlink_dest() {
+  local dest="$1"
+  local operation="${2:-modify}"
+
+  if ! path_safety_is_symlink "${dest}"; then
+    return 0
+  fi
+
+  case "${operation}" in
+    remove)
+      echo "error: refusing to remove symlink destination: ${dest}" >&2
+      ;;
+    *)
+      echo "error: refusing to modify symlink destination: ${dest}" >&2
+      ;;
+  esac
+  echo "error: remove or replace the symlink manually if this is intentional" >&2
+  return 1
+}
+
+path_safety_canonicalize_non_symlink_path() {
+  local expanded="$1"
+  local resolved parent base
 
   case "${expanded}" in
     ""|"/"|"."|"..")
@@ -31,22 +64,38 @@ path_safety_canonical_dest() {
       ;;
   esac
 
-  base="$(basename "${expanded}")"
-  parent="$(dirname "${expanded}")"
-
   if [[ -e "${expanded}" ]]; then
+    if command -v realpath >/dev/null 2>&1; then
+      resolved="$(realpath "${expanded}" 2>/dev/null || true)"
+      if [[ -n "${resolved:-}" ]]; then
+        printf '%s\n' "${resolved}"
+        return 0
+      fi
+    fi
+
     if command -v readlink >/dev/null 2>&1; then
       resolved="$(readlink -f "${expanded}" 2>/dev/null || true)"
+      if [[ -n "${resolved:-}" ]]; then
+        printf '%s\n' "${resolved}"
+        return 0
+      fi
     fi
-    if [[ -z "${resolved:-}" ]] && command -v realpath >/dev/null 2>&1; then
-      resolved="$(realpath "${expanded}" 2>/dev/null || true)"
+
+    if command -v python3 >/dev/null 2>&1; then
+      resolved="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "${expanded}" 2>/dev/null || true)"
+      if [[ -n "${resolved:-}" ]]; then
+        printf '%s\n' "${resolved}"
+        return 0
+      fi
     fi
-    if [[ -n "${resolved:-}" ]]; then
-      printf '%s\n' "${resolved}"
-      return 0
-    fi
+
+    echo "error: could not canonicalize destination path safely: ${expanded}" >&2
+    echo "error: install realpath, readlink, or Python 3 for path normalization" >&2
     return 1
   fi
+
+  parent="$(dirname "${expanded}")"
+  base="$(basename "${expanded}")"
 
   if [[ -d "${parent}" ]]; then
     resolved="$(cd "${parent}" && pwd)/${base}"
@@ -62,11 +111,21 @@ path_safety_canonical_dest() {
     fi
   fi
 
+  if command -v python3 >/dev/null 2>&1; then
+    resolved="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "${expanded}" 2>/dev/null || true)"
+    if [[ -n "${resolved:-}" ]]; then
+      printf '%s\n' "${resolved}"
+      return 0
+    fi
+  fi
+
   if [[ "${expanded}" == /* ]]; then
     printf '%s\n' "${expanded}"
     return 0
   fi
 
+  echo "error: could not canonicalize destination path safely: ${expanded}" >&2
+  echo "error: install realpath, readlink, or Python 3 for path normalization" >&2
   return 1
 }
 
@@ -93,13 +152,17 @@ path_safety_under_cursor_skills() {
 }
 
 # Validate a call-codex skill destination.
-# Args: dest allow_outside(0|1) home
-# Prints canonical path on success; writes errors to stderr.
+# Flow: expand -> refuse symlink on expanded path -> canonicalize -> validate.
+# Args: raw_dest allow_outside(0|1) home
+# Sets PATH_SAFETY_EXPANDED_DEST and PATH_SAFETY_CANONICAL_DEST.
 path_safety_validate_dest() {
   local raw_dest="$1"
   local allow_outside="${2:-0}"
   local home="${3:-${HOME}}"
-  local canonical base
+  local expanded canonical base
+
+  PATH_SAFETY_EXPANDED_DEST=""
+  PATH_SAFETY_CANONICAL_DEST=""
 
   case "${raw_dest}" in
     "~"|"${home}"|"${home}/.cursor"|"${home}/.cursor/skills"|"/"|"."|"..")
@@ -108,7 +171,16 @@ path_safety_validate_dest() {
       ;;
   esac
 
-  if ! canonical="$(path_safety_canonical_dest "${raw_dest}")"; then
+  expanded="$(path_safety_expand_path "${raw_dest}")"
+  PATH_SAFETY_EXPANDED_DEST="${expanded}"
+
+  if path_safety_is_symlink "${expanded}"; then
+    echo "error: refusing to use symlink destination: ${expanded}" >&2
+    echo "error: remove or replace the symlink manually if this is intentional" >&2
+    return 1
+  fi
+
+  if ! canonical="$(path_safety_canonicalize_non_symlink_path "${expanded}")"; then
     echo "error: could not resolve destination path: ${raw_dest}" >&2
     return 1
   fi
@@ -130,17 +202,7 @@ path_safety_validate_dest() {
     return 1
   fi
 
-  printf '%s\n' "${canonical}"
-}
-
-# Refuse symlink destinations for destructive operations.
-path_safety_refuse_symlink_dest() {
-  local dest="$1"
-  if [[ -L "${dest}" ]]; then
-    echo "error: refusing to modify symlink destination: ${dest}" >&2
-    echo "error: remove or replace the symlink manually if this is intentional" >&2
-    return 1
-  fi
+  PATH_SAFETY_CANONICAL_DEST="${canonical}"
   return 0
 }
 

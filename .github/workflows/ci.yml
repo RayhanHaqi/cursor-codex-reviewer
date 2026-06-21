@@ -17,12 +17,12 @@ jobs:
       - name: Validate shell syntax
         run: |
           bash -n scripts/*.sh
+          bash -n scripts/lib/*.sh
           bash -n tests/*.sh
 
       - name: Run ShellCheck
         run: |
-          shellcheck scripts/*.sh tests/*.sh
-          shellcheck scripts/lib/path-safety.sh
+          shellcheck scripts/*.sh scripts/lib/*.sh tests/*.sh
 
       - name: Run smoke tests
         run: ./tests/smoke-test.sh

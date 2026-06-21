@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.2] - 2026-06-21
+
+### Security
+
+- Rejected symlink destinations before path canonicalization during install and uninstall
+- Prevented install and uninstall operations from following symlink targets
+- Added lifecycle coverage for symlink safety behavior
+
+### Changed
+
+- Improved cross-platform path canonicalization fallback handling
+- Extended CI and smoke tests to validate path-safety helpers
+
 ## [0.1.1] - 2026-06-21
 
 ### Changed

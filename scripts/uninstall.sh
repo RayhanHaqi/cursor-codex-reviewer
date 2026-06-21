@@ -52,21 +52,27 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-CANONICAL_DEST="$(path_safety_validate_dest "${DEST}" "${ALLOW_OUTSIDE}" "${HOME}")"
+EXPANDED_DEST="$(path_safety_expand_path "${DEST}")"
+path_safety_refuse_symlink_dest "${EXPANDED_DEST}" "remove"
 
-if [[ ! -e "${CANONICAL_DEST}" ]]; then
-  echo "Nothing to uninstall. Path does not exist: ${CANONICAL_DEST}"
-  exit 0
-fi
-
-path_safety_refuse_symlink_dest "${CANONICAL_DEST}"
-
-if [[ ! -f "${CANONICAL_DEST}/SKILL.md" ]]; then
-  echo "error: ${CANONICAL_DEST} does not look like a call-codex skill directory (missing SKILL.md)" >&2
+if ! path_safety_validate_dest "${DEST}" "${ALLOW_OUTSIDE}" "${HOME}"; then
   exit 1
 fi
 
-path_safety_print_uninstall_plan "${CANONICAL_DEST}" "${YES}"
+CANONICAL_DEST="${PATH_SAFETY_CANONICAL_DEST}"
+OPERATIONAL_DEST="${PATH_SAFETY_EXPANDED_DEST}"
+
+if [[ ! -e "${OPERATIONAL_DEST}" ]]; then
+  echo "Nothing to uninstall. Path does not exist: ${OPERATIONAL_DEST}"
+  exit 0
+fi
+
+if [[ ! -f "${OPERATIONAL_DEST}/SKILL.md" ]]; then
+  echo "error: ${OPERATIONAL_DEST} does not look like a call-codex skill directory (missing SKILL.md)" >&2
+  exit 1
+fi
+
+path_safety_print_uninstall_plan "${OPERATIONAL_DEST}" "${YES}"
 echo
 
 if [[ "${YES}" -eq 0 ]]; then
@@ -80,11 +86,11 @@ if [[ "${YES}" -eq 0 ]]; then
   esac
 fi
 
-PARENT_DIR="$(dirname "${CANONICAL_DEST}")"
-rm -rf "${CANONICAL_DEST}"
+PARENT_DIR="$(dirname "${OPERATIONAL_DEST}")"
+rm -rf "${OPERATIONAL_DEST}"
 
 if [[ -d "${PARENT_DIR}" ]]; then
   echo "Parent directory preserved: ${PARENT_DIR}"
 fi
 
-echo "Removed: ${CANONICAL_DEST}"
+echo "Removed: ${OPERATIONAL_DEST}"

@@ -108,7 +108,7 @@ Uninstall:
 ./scripts/uninstall.sh --yes
 ```
 
-The installer and uninstaller validate destinations and refuse unsafe paths such as `/`, `$HOME`, or `$HOME/.cursor/skills`.
+The installer and uninstaller validate destinations and refuse unsafe paths such as `/`, `$HOME`, or `$HOME/.cursor/skills`. Symlink destinations are refused before canonicalization; remove or replace symlinks manually if needed. Path canonicalization may require `realpath`, `readlink`, or Python 3.
 
 ## Usage examples
 
