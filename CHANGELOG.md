@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.3] - 2026-06-24
+
+### Changed
+
+- Pinned primary Codex model to `gpt-5.5` for `/call-codex` reviews
+- Deep review uses `model_reasoning_effort="xhigh"`; Standard uses `high`; Quick uses `medium`
+- Documented explicit primary deep-review command with `-s read-only` and `-a untrusted`
+- Failure handling now stops on `gpt-5.5` unavailability instead of silently falling back to another model or downgrading effort
+
+### Security
+
+- No change to read-only containment defaults; workspace-write remains explicit opt-in only
+
 ## [0.1.2] - 2026-06-21
 
 ### Security

@@ -51,7 +51,7 @@ Run:
 **Fix:**
 1. Retry later or choose a lower review depth.
 2. Check billing and usage in your OpenAI/Codex account.
-3. Try a different model if your CLI supports it.
+3. If `gpt-5.5` is unsupported for your account, report the exact CLI error and stop. Do not silently substitute another model; get explicit user approval before trying a different model.
 
 ## Skill not appearing in Cursor
 

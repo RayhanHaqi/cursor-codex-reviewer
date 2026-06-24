@@ -118,7 +118,12 @@ done
 echo
 
 SKILL_FILE="${REPO_ROOT}/skills/call-codex/SKILL.md"
-require_grep "${SKILL_FILE}" "skill-release: 0.1.2" "SKILL.md includes skill-release marker"
+require_grep "${SKILL_FILE}" "skill-release: 0.1.3" "SKILL.md includes skill-release marker"
+require_grep "${SKILL_FILE}" "gpt-5.5" "SKILL.md pins primary model gpt-5.5"
+require_grep "${SKILL_FILE}" 'model_reasoning_effort="xhigh"' "SKILL.md documents deep-review xhigh effort"
+require_grep "${SKILL_FILE}" "No silent fallback" "SKILL.md forbids silent model downgrade/fallback"
+require_no_grep "${SKILL_FILE}" "codex -m gpt-5.3-codex" "SKILL.md excludes gpt-5.3-codex as executable model flag"
+require_grep "${SKILL_FILE}" "do not silently retry with \`gpt-5.3-codex\`" "SKILL.md forbids silent gpt-5.3-codex fallback"
 require_grep "${SKILL_FILE}" "read-only" "SKILL.md mentions read-only"
 require_grep "${SKILL_FILE}" "explicit approval" "SKILL.md mentions explicit approval"
 require_grep "${SKILL_FILE}" "workspace-write" "SKILL.md mentions workspace-write"
@@ -135,7 +140,7 @@ require_grep "${SKILL_FILE}" "Do not ask the run-approval popup yet" "SKILL.md s
 echo
 
 README_FILE="${REPO_ROOT}/README.md"
-require_grep "${README_FILE}" "Experimental / v0.1.2" "README mentions Experimental / v0.1.2"
+require_grep "${README_FILE}" "Experimental / v0.1.3" "README mentions Experimental / v0.1.3"
 require_grep "${README_FILE}" "read-only" "README mentions read-only"
 require_grep "${README_FILE}" "Cursor" "README mentions Cursor"
 require_grep "${README_FILE}" "Codex" "README mentions Codex"

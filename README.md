@@ -6,7 +6,7 @@ Use Codex as a second-opinion reviewer in Cursor without granting write access b
 
 ## Status
 
-**Experimental / v0.1.2** — Complete safety and portability integration.
+**Experimental / v0.1.3** — GPT-5.5 model policy and read-only review defaults.
 
 This project was extracted from a personal Cursor + Codex workflow and generalized for public use. Some integrations may require adaptation for your own local environment.
 

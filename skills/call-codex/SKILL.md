@@ -1,6 +1,6 @@
 # call-codex
 
-skill-release: 0.1.2
+skill-release: 0.1.3
 
 Use this skill when the user asks to call Codex, get a Codex second opinion, review an implementation or diff, critique a plan, verify a change, or inspect failing tests using Codex.
 
@@ -19,6 +19,35 @@ Do not commit, push, publish, delete, migrate, upgrade dependencies, or perform 
 Do not run expensive, destructive, long-running, or state-changing commands without explicit user approval.
 
 Treat Codex output as a second opinion, not a guaranteed truth source.
+
+## Default model and reasoning
+
+**Primary model (fixed):** `gpt-5.5`
+
+Do not substitute another model (e.g. `gpt-5.3-codex`, `o3`, or CLI default) unless the user explicitly names a different model in the same turn.
+
+**Reasoning effort by review depth:**
+
+| Depth | Effort |
+| --- | --- |
+| A) Deep | `xhigh` |
+| B) Standard | `high` |
+| C) Quick | `medium` |
+
+**Primary Codex command** (deep review / default):
+
+```bash
+codex -m gpt-5.5 \
+  -c 'model_reasoning_effort="xhigh"' \
+  -s read-only \
+  -a untrusted \
+  -C "$PWD" \
+  exec - < "${PROMPT_FILE}"
+```
+
+For B/C, keep `-m gpt-5.5` and swap only `model_reasoning_effort` to `high` or `medium`.
+
+**No silent fallback:** If `gpt-5.5` is unavailable, unsupported, or returns a model error, report the exact CLI error and stop. Do not retry with another model or downgrade deep-review effort from `xhigh` to `high` without explicit user approval.
 
 ## Data boundary and privacy
 
@@ -195,13 +224,13 @@ Default recommendation: choose **A) Deep review** unless the task is tiny or the
 
 Offer:
 
-- A) Deep review — high reasoning effort
+- A) Deep review — `xhigh` reasoning effort (`gpt-5.5`)
   Recommended/default for most `/call-codex` uses. Use richer relevant context: task, Cursor plan, likely files, relevant snippets or current diff summary, relevant tests, verification commands, known risks, and exact questions for Codex.
 
-- B) Standard review — medium-high reasoning effort
+- B) Standard review — `high` reasoning effort (`gpt-5.5`)
   Use for ordinary risky plans when a full deep review is not necessary. Include task, Cursor plan, likely files, verification strategy, and known risks.
 
-- C) Quick review — medium reasoning effort
+- C) Quick review — `medium` reasoning effort (`gpt-5.5`)
   Use only for cheap sanity checks or when the user explicitly asks to save usage. Plan text only.
 
 - D) Skip Codex
@@ -447,22 +476,37 @@ Verification context:
 
    Unless the user explicitly chose `--keep-prompt` (or equivalent approval to preserve the file for debugging), register cleanup so the prompt file is removed after Codex completes, errors, or the workflow exits.
 
-   Preferred command pattern (adapt model and effort to the user's environment):
+   Primary command (A) Deep — use exactly this shape unless the user explicitly chose another model:
 
    ```bash
-   codex -m <model> -c model_reasoning_effort="<selected-effort>" -s read-only -a untrusted -C "$PWD" exec - < "${PROMPT_FILE}"
+   codex -m gpt-5.5 \
+     -c 'model_reasoning_effort="xhigh"' \
+     -s read-only \
+     -a untrusted \
+     -C "$PWD" \
+     exec - < "${PROMPT_FILE}"
    ```
 
-   Replace `<model>` with an available Codex model (e.g. the user's configured default).
-   Replace `<selected-effort>` with exactly one value appropriate for the chosen depth (e.g. `medium`, `high`, or `xhigh`).
+   For B) Standard or C) Quick, keep `-m gpt-5.5` and set `model_reasoning_effort` to `high` or `medium` respectively.
+
+   Do not omit `-a untrusted`. Do not move `-s read-only`, `-a untrusted`, or `-C "$PWD"` after `exec`.
+
+   If the CLI reports that `gpt-5.5` is unavailable or unsupported, stop and show the error. Do not silently pick another model or downgrade `xhigh` to `high`.
 
    Launch Cursor from an environment where `codex` is already on `PATH` and any required variables are already configured. The skill does not source shell profiles or environment files automatically.
 
    If `-s read-only` fails because of local bubblewrap/user-namespace sandbox issues, do not switch silently. Ask the user using the **Degraded containment fallback** approval requirements (see Sandbox modes) before using:
 
    ```bash
-   codex -m <model> -c model_reasoning_effort="<selected-effort>" -s workspace-write -a untrusted -C "$PWD" exec - < "${PROMPT_FILE}"
+   codex -m gpt-5.5 \
+     -c 'model_reasoning_effort="<selected-effort>"' \
+     -s workspace-write \
+     -a untrusted \
+     -C "$PWD" \
+     exec - < "${PROMPT_FILE}"
    ```
+
+   Use the same depth→effort mapping as read-only mode (`xhigh` / `high` / `medium`). Do not change model on fallback.
 
    Even with `workspace-write`, Codex must remain read-only by instruction, but technical write protection is weakened. Do not use `danger-full-access` or bypass sandbox unless the user explicitly approves for a disposable test.
 
@@ -617,13 +661,13 @@ Selected role:
 - no broad scans
 
 Choose review depth:
-A) Deep review — high reasoning effort, recommended/default
+A) Deep review — xhigh reasoning effort (gpt-5.5), recommended/default
    Rich context: plan + likely files + relevant snippets/diff summary + tests + verification risks.
 
-B) Standard review — medium-high reasoning effort
+B) Standard review — high reasoning effort (gpt-5.5)
    Normal second opinion: plan + likely files + verification strategy + known risks.
 
-C) Quick review — medium reasoning effort
+C) Quick review — medium reasoning effort (gpt-5.5)
    Cheap sanity check: plan text only.
 
 D) Skip Codex
@@ -677,6 +721,13 @@ If Codex is not installed, not authenticated, or command syntax fails:
 - report the exact error
 - offer a pasteable handoff prompt for the user to run manually in Codex
 - continue with Cursor only if the user chooses
+
+If the CLI reports that `gpt-5.5` is unavailable, unsupported, or not enabled for the account:
+
+- stop immediately
+- show the exact model error from Codex
+- do not silently retry with `gpt-5.3-codex`, CLI default, or any other model
+- do not downgrade deep-review `xhigh` to `high` without explicit user approval
 
 If Codex output is vague, contradictory, or tries to expand scope:
 

@@ -55,7 +55,7 @@ PROMPT_FILE="$(mktemp "${TMPDIR:-/tmp}/codex-review.XXXXXX.md")"
 chmod 600 "${PROMPT_FILE}"
 trap 'rm -f "${PROMPT_FILE}"' EXIT
 
-codex -m <model> -c model_reasoning_effort="<effort>" -s read-only -a untrusted -C "$PWD" exec - < "${PROMPT_FILE}"
+codex -m gpt-5.5 -c 'model_reasoning_effort="xhigh"' -s read-only -a untrusted -C "$PWD" exec - < "${PROMPT_FILE}"
 ```
 
 - `-s read-only`: model-generated shell commands run in a read-only sandbox.
