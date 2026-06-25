@@ -1,75 +1,63 @@
-# Example: Review an Implementation
+# Example: Plan a Focused Code Change
 
 Fictional project: **ledger-lite** — a small Python CLI for expense tracking.
 
-## 1. Cursor implements a focused change
+## 1. User invokes planning (no prior implementation)
 
-**User:** Add validation so expense amounts must be positive.
+**User:** `/call-codex add validation so expense amounts must be positive`
 
-Cursor edits `src/ledger/validators.py`:
+Cursor stays launcher-only: no file reads, no Git inspection. User selects **A) Deep — xhigh** and approves **Run Codex now**.
 
-```python
-def validate_amount(amount: float) -> None:
-    if amount <= 0:
-        raise ValueError("amount must be positive")
-```
+## 2. Codex investigates and returns a plan
 
-Cursor updates `tests/test_validators.py` with one new test and reports `pytest tests/test_validators.py -q` passed.
-
-## 2. User requests Codex review
-
-**User:** `/call-codex review this implementation`
-
-Cursor prepares:
-- task summary
-- auto-context bundle (`git diff`, changed files)
-- verification context from the session
-- proposed read-only Codex command
-
-Cursor shows review depth options and the exact command. User selects **A) Deep review** and approves **Run Codex now**.
-
-## 3. Codex inspects and returns structured findings
-
-Codex reviews the diff and test file (read-only) and returns:
+Codex reads `src/ledger/validators.py`, `src/ledger/money.py`, and existing tests read-only:
 
 ```markdown
-# Verdict
+## Scope Read
+- `src/ledger/validators.py`, `src/ledger/money.py`, `tests/test_validators.py`, `src/ledger/cli.py`
 
-Approve with notes
+## Evidence
+- No `validate_amount` helper exists today.
+- `money.py` defines `parse_money()` returning `Decimal`.
+- CLI `ledger add` currently accepts raw string amounts parsed as float in one code path.
 
-# Findings
+## Assumptions and Unknowns
+- Whether public API should accept floats or only `Decimal`/strings (CLI path needs confirmation).
 
-## Medium — Float amounts allow silent precision issues
-- **Summary:** `float` comparison may mishandle decimal currency values.
-- **Evidence:** `validators.py` accepts `float`; existing `Money` type in `src/ledger/money.py` uses `Decimal`.
-- **Why it matters:** Users entering `0.1 + 0.2` style values may pass validation but corrupt totals elsewhere.
-- **Suggested next step:** Accept `Decimal` or reuse `parse_money()` from `money.py`.
+## Recommended Plan
+1. Add `validate_amount` in `validators.py` using `Decimal` via `parse_money()`.
+2. Wire validation into CLI add path before persistence.
+3. Add unit tests for positive, zero, and negative amounts.
 
-## Low — Missing test for zero boundary
-- **Summary:** No explicit test for `amount == 0`.
-- **Evidence:** `tests/test_validators.py` covers negative values only.
-- **Why it matters:** Boundary clarity prevents regression if comparison changes.
-- **Suggested next step:** Add `test_rejects_zero_amount`.
+## Execution Packet for Cursor
 
-# Test and verification gaps
+### Target Files
+- `src/ledger/validators.py` (new or extend)
+- `src/ledger/cli.py`
+- `tests/test_validators.py`
 
-- No integration test through CLI entrypoint `ledger add`.
-- Suggested verification (not yet run): `pytest tests/ -q`
+### Constraints
+- Reuse `parse_money()`; do not introduce parallel float parsing.
 
-# Assumptions and uncertainty
+### Non-goals
+- Refactoring unrelated CLI commands.
 
-- Did not inspect `src/ledger/money.py` implementation details beyond import graph.
-- Assumed CLI path still accepts raw floats.
+### Acceptance Criteria
+- Zero and negative amounts raise clear validation errors.
+- Positive decimal amounts pass.
 
-# Suggested Cursor follow-up
+### Focused Verification
+- `pytest tests/test_validators.py -q` (not yet run)
 
-1. Switch validator input to `Decimal` via existing money helper.
-2. Add zero-boundary unit test.
-3. Run full test suite before merge.
+### Cursor-Ready Prompt
+Implement validation per plan. Minimal diff. Run only focused pytest.
+
+## Risks
+- Float literals in tests may need `Decimal` strings for consistency.
 ```
 
-## 4. Cursor applies only justified changes
+## 3. Cursor implements after user approval
 
-Cursor agrees the `Decimal` alignment is a real convention mismatch and adds the zero test. It skips any broader refactor Codex mentioned as optional.
+**User:** Go ahead with the plan.
 
-**User approves edits.** Cursor implements two small changes, reruns tests, and stops.
+Cursor implements the scoped change, runs approved verification, and stops. No automatic post-implementation Codex review.

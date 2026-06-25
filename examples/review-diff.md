@@ -1,73 +1,57 @@
-# Example: Review the Current Diff
+# Example: Plan a Bugfix From Symptoms
 
 Fictional project: **cachekit** — Redis wrapper library.
 
-## 1. User requests diff review
+## 1. User describes incorrect behavior
 
-**User:** `/call-codex review the current diff`
+**User:** `/call-codex cache misses return empty bytes instead of None — find the smallest safe fix`
 
-Working tree change (single file):
+Cursor does not run `git diff` or open files. User selects **B) Standard — high** and runs Codex read-only.
 
-```diff
-diff --git a/src/cachekit/client.py b/src/cachekit/client.py
-index abc123..def456 100644
---- a/src/cachekit/client.py
-+++ b/src/cachekit/client.py
-@@ -40,7 +40,7 @@ class CacheClient:
-     def get(self, key: str) -> Optional[bytes]:
--        return self._redis.get(key)
-+        value = self._redis.get(key)
-+        return value if value is not None else b""
-```
-
-Cursor gathers `git diff`, file list, and recent `pytest tests/test_client.py -q` result (passed).
-
-User selects **B) Standard review** and runs Codex read-only.
-
-## 2. Codex distinguishes confirmed vs suggested findings
+## 2. Codex investigates and distinguishes evidence from proposal
 
 ```markdown
-# Verdict
+## Scope Read
+- `src/cachekit/client.py`, `tests/test_client.py`, package `__init__.py` exports
 
-Changes requested
+## Evidence
+- `CacheClient.get()` recently changed to return `b""` when Redis returns `None`.
+- Public docstring still documents `Optional[bytes]` with `None` on miss.
+- Tests cover hit cases only; no explicit miss assertion.
 
-# Findings
+## Assumptions and Unknowns
+- Downstream callers may rely on `is None` checks (not fully traced).
 
-## High — Empty byte string changes API contract
-- **Summary:** Missing keys now return `b""` instead of `None`.
-- **Evidence:** `client.py` diff hunk at `get()` return path.
-- **Why it matters:** Callers using `if value is None` will treat misses as empty values.
-- **Suggested next step:** Revert to `None` or document breaking change and update all call sites.
+## Recommended Plan
+1. Revert miss path to return `None` to match documented contract.
+2. Add `test_get_missing_returns_none`.
+3. Grep internal callers for `b""` assumptions before merge.
 
-## Medium — Test gap for cache miss semantics
-- **Summary:** Existing tests may only cover hit cases.
-- **Evidence:** Session verification ran `test_client.py` but diff does not update tests.
-- **Why it matters:** Regression may ship with green tests.
-- **Suggested next step:** Add `test_get_missing_returns_none` (or new contract test).
+## Execution Packet for Cursor
 
-## Low — Suggestion: consider typed Optional wrapper
-- **Summary:** A `CacheResult` type could make miss/hit explicit.
-- **Evidence:** N/A — design suggestion only.
-- **Why it matters:** May reduce future ambiguity.
-- **Suggested next step:** Optional follow-up; not required for this fix.
+### Target Files
+- `src/cachekit/client.py`
+- `tests/test_client.py`
 
-# Test and verification gaps
+### Constraints
+- Preserve hit-path behavior unchanged.
 
-- Confirm whether public docs promise `None` on miss (`README.md` not inspected by Codex).
-- Suggested verification: `pytest tests/test_client.py -q` after adding miss-case test.
+### Non-goals
+- Introducing a new `CacheResult` wrapper type.
 
-# Assumptions and uncertainty
+### Acceptance Criteria
+- Miss returns `None`; test proves it.
 
-- Assumed `get()` is part of public API surface.
-- Did not inspect downstream internal callers.
+### Focused Verification
+- `pytest tests/test_client.py -q` (not yet run)
 
-# Suggested Cursor follow-up
+### Cursor-Ready Prompt
+Apply minimal contract fix. Add miss test. Do not refactor API surface.
 
-1. Treat High finding as confirmed — revert or make an explicit breaking-change migration.
-2. Add miss-case test before merge.
-3. Re-run targeted tests.
+## Risks
+- If any caller intentionally depended on `b""`, revert may break them — internal grep required.
 ```
 
 ## 3. Outcome
 
-Cursor reverts the `b""` fallback as a confirmed contract break, adds a miss test, and does not pursue the optional `CacheResult` refactor in this change.
+Cursor applies the minimal revert and test from the execution packet. Optional API redesign stays out of scope.

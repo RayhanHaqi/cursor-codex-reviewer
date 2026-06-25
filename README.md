@@ -1,75 +1,75 @@
 # cursor-codex-reviewer
 
-> An opinionated read-only Codex reviewer skill for Cursor.
+> An opinionated Codex-first planning skill for Cursor.
 
-Use Codex as a second-opinion reviewer in Cursor without granting write access by default.
+Use Codex as the first read-only investigator and implementation planner before Cursor edits code.
 
 ## Status
 
-**Experimental / v0.1.3** — GPT-5.5 model policy and read-only review defaults.
+**Experimental / v0.2.0** — Codex-first planning with launcher-only Cursor behavior before Codex runs.
 
 This project was extracted from a personal Cursor + Codex workflow and generalized for public use. Some integrations may require adaptation for your own local environment.
 
 ## Why this exists
 
-Cursor is strong at implementation, but the same agent that writes code also verifies it. For risky changes, architecture decisions, or incomplete verification, a structured second opinion can catch regressions, edge cases, and task mismatches before they land.
+Cursor is strong at implementation, but planning and investigation on unfamiliar or risky work can burn context or bake in wrong assumptions. For multi-file changes, architecture decisions, or unclear bugs, a dedicated first-pass planner can gather evidence and produce a focused execution packet before any edits.
 
-`/call-codex` wraps that workflow as a predictable review harness — not an autonomous agent framework.
+`/call-codex` wraps that workflow as a predictable planning harness — not an autonomous agent framework.
 
 ## What it does
 
-- Installs a Cursor skill (`/call-codex`) that invokes Codex CLI as a **read-only reviewer**
-- Prepares a focused review prompt with optional git context
+- Installs a Cursor skill (`/call-codex`) that invokes Codex CLI as the **first read-only planner**
+- Keeps Cursor launcher-only before Codex runs: no repo reads, Git inspection, MCP calls, or Cursor-created plans
 - Requires explicit user approval before running Codex
-- Returns **structured findings** with verdict, severity, evidence, and follow-up steps
-- Supports plan review, diff review, implementation review, and verification critique
+- Returns a **structured plan** with evidence, target files, constraints, and a Cursor-ready execution prompt
+- Supports workflow-only mode to preview the prompt and command without running Codex in the same turn
 - Provides install, uninstall, and doctor scripts
 
 ## What it does not do
 
-- Replace Cursor as the primary implementation agent
-- Automatically review every change
+- Replace Cursor as the implementation agent after planning
+- Automatically plan or review every change
 - Run Codex without user approval
-- Guarantee correct review output
+- Guarantee correct planning output
 - Provide Codex CLI, Cursor, or MCP servers
 - Orchestrate autonomous multi-agent loops
+- Act as a default post-implementation Codex review pass
 - Commit, push, or publish on your behalf
 
 ## Core workflow
 
-1. **Cursor** implements or prepares a plan.
-2. **User** invokes `/call-codex` with a review request.
-3. **Cursor** gathers context, prepares the prompt and exact `codex exec` command.
-4. **User** chooses review depth and approves (or cancels) execution.
-5. **Codex** runs read-only and returns structured findings.
-6. **Cursor** summarizes and recommends next steps.
-7. **User** decides what to implement.
+1. **User** describes the task and invokes `/call-codex`.
+2. **Cursor** (launcher only) asks for planning depth, prepares the prompt summary and exact `codex exec` command — without reading the repository.
+3. **User** approves (or cancels) execution.
+4. **Codex** runs read-only, investigates relevant files, and returns a structured plan plus execution packet.
+5. **User** reviews the plan and decides whether to proceed.
+6. **Cursor** implements only after explicit user approval.
 
 ## Key principles
 
 | Principle | Description |
 |---|---|
+| Codex-first investigation | Codex performs the first relevant repository read |
+| Launcher-only Cursor | Before Codex runs, Cursor does not inspect repo, Git, or MCPs |
 | Read-only by default | Codex uses `-s read-only` sandboxing |
 | Explicit approval | No execution without user confirmation |
-| Role separation | Cursor implements; Codex reviews; user approves risk |
-| Structured output | Findings include severity, evidence, and next steps |
-| Cost awareness | One Codex call per review unless user requests more |
-| Honest uncertainty | Assumptions and gaps are explicit |
+| Structured output | Plans include evidence, target files, and verification steps |
+| Cost awareness | One Codex call per planning session unless user requests more |
+| Honest uncertainty | Assumptions and unknowns are explicit |
 
 ### Default role split
 
 | Component | Default role |
 |---|---|
-| Cursor / Composer | Main executor and implementation agent |
-| Codex | Read-only reviewer and second opinion |
-| User | Approves risky, expensive, state-changing, or write-enabled actions |
+| Codex | First read-only investigator and implementation planner |
+| Cursor / Composer | Launcher before Codex; implementation harness after user approves the plan |
+| User | Approves planning depth, Codex execution, and all edits |
 
 ## Requirements
 
 - **Cursor** with skill support (desktop app or CLI)
 - **Codex CLI** installed and authenticated
 - **bash** for install/doctor scripts
-- **git** (optional, for auto-context gathering)
 - Linux or macOS shell environment recommended
 
 Compatibility with all Cursor versions, Codex versions, operating systems, shells, or editors is **not guaranteed**.
@@ -112,43 +112,39 @@ The installer and uninstaller validate destinations and refuse unsafe paths such
 
 ## Usage examples
 
-In Cursor, after implementing or planning a change:
+In Cursor, describe a task before implementation:
 
 ```
-/call-codex review this implementation
-/call-codex review the current diff
-/call-codex review this plan before I implement it
-/call-codex inspect these failing tests
-/call-codex verify whether the implementation matches the task
-/call-codex critique this architecture decision
-/call-codex identify edge cases and missing tests
+/call-codex add retry with exponential backoff for webhook deliveries
+/call-codex plan the refactor of the session middleware
+/call-codex investigate why calibration drifts after camera reconnect
+/call-codex design a minimal benchmark for the new tracker module
 ```
 
-Workflow-only (prepare prompt without running Codex):
+Workflow-only (prepare prompt without running Codex in the same turn):
 
 ```
-/call-codex workflow only
+/call-codex workflow only — add OAuth token refresh to the API client
 ```
 
 See [`examples/`](examples/) for realistic interactions.
 
 ## Data boundary and privacy
 
-Data boundary: `/call-codex` may send selected repository context, diffs, plans, task descriptions, and logs to Codex. Review the generated prompt before approval. Do not use the skill with confidential code or sensitive data unless your organization's policy and your Codex account configuration permit it.
+Data boundary: `/call-codex` sends the user task to Codex; Codex independently reads relevant repository files during its investigation after you approve execution. Review the generated prompt summary before approval. Do not use the skill with confidential code or sensitive data unless your organization's policy and your Codex account configuration permit it.
 
-- Prompt context is minimized by default.
-- Full repository diffs are not included blindly.
-- Review prompts use private per-invocation temporary files (`mktemp`, `chmod 600`) with automatic cleanup.
-- Sensitive paths (`.env`, keys, credentials, build artifacts) are excluded from gathering where practical. This does not guarantee sensitive data cannot be sent.
+- Cursor does not pre-gather repository context before Codex runs.
+- Planning prompts use private per-invocation temporary files (`codex-plan.*`, `mktemp`, `chmod 600`) with automatic cleanup.
+- Codex is instructed to avoid secrets, credentials, datasets, checkpoints, and large artifacts. This does not guarantee sensitive data cannot be read.
 
 ## Safety model
 
-Codex operates in **read-only review mode** by default.
+Codex operates in **read-only planning mode** by default.
 
 ### Default mode: Read-only containment
 
 - Codex runs with `-s read-only` where supported.
-- Codex is instructed to review only.
+- Codex is instructed to plan only; no edits, commits, or long-running commands.
 - Workspace mutation is technically restricted by sandbox configuration.
 
 ### Fallback mode: Degraded containment fallback
@@ -161,28 +157,30 @@ The skill does not source shell profiles or environment files automatically. Lau
 
 Full details: [`docs/safety-model.md`](docs/safety-model.md)
 
-## Review output format
+## Planning output format
 
 Codex returns structured markdown:
 
 ```markdown
-# Verdict
-# Findings        (Critical / High / Medium / Low)
-# Test and verification gaps
-# Assumptions and uncertainty
-# Suggested Cursor follow-up
+## Scope Read
+## Evidence
+## Assumptions and Unknowns
+## Recommended Plan
+## Execution Packet for Cursor
+## Risks
+## MCP Usage
 ```
 
 Sample: [`examples/sample-output.md`](examples/sample-output.md)
 
 ## Optional integrations
 
-Optional integrations may enrich context or improve documentation lookup, but core review behavior should still work without them.
+Codex may use configured MCP tools when directly relevant during its investigation. Cursor must not call MCPs before Codex runs.
 
-Examples (if configured in your Cursor environment):
+Examples (if configured in your Cursor/Codex environment):
 
 - MCP servers for code intelligence, GitHub, or web search
-- Context7 for library documentation (via optional shell helper and `~/.cursor/mcp.json`)
+- Context7 for library documentation
 - Paper search for research-heavy tasks
 
 Do not commit API keys or credentials. See [`docs/troubleshooting.md`](docs/troubleshooting.md).
@@ -211,7 +209,7 @@ cursor-codex-reviewer/
 
 ## Limitations
 
-Codex review is **not** a replacement for:
+Codex planning is **not** a replacement for:
 
 - tests
 - CI
@@ -222,7 +220,7 @@ Codex review is **not** a replacement for:
 Other limitations:
 
 - Codex may hallucinate files, APIs, or causes
-- Large repos need narrow review scopes
+- Large repos need focused task descriptions
 - CLI auth, billing, and rate limits are outside this repo
 - Optional integrations may not work in every setup
 - Output format may evolve
@@ -251,7 +249,7 @@ Common issues: [`docs/troubleshooting.md`](docs/troubleshooting.md)
 Recommended repository description:
 
 ```text
-Read-only Codex second-opinion reviewer skill for Cursor, with approval gates and structured review output.
+Codex-first read-only planning skill for Cursor, with launcher-only Cursor behavior and explicit approval gates.
 ```
 
 Suggested topics:
@@ -262,7 +260,7 @@ codex
 openai-codex
 ai-agents
 coding-agents
-code-review
+planning
 cursor-skill
 developer-tools
 llm
@@ -271,7 +269,7 @@ agent-workflow
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). Please preserve read-only-by-default behavior and explicit approval gates.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Please preserve Codex-first launcher behavior, read-only-by-default execution, and explicit approval gates.
 
 ## License
 

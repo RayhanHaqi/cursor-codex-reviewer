@@ -2,70 +2,81 @@
 
 ## Problem
 
-When Cursor implements a change, the same agent that wrote the code also verifies it. That is efficient, but it can miss regressions, edge cases, or mismatches with the original task — especially on risky or architecture-sensitive work.
+When Cursor plans and implements a change in one session, investigation and editing share the same context. That is efficient for small tasks, but on unfamiliar, multi-file, or architecture-sensitive work it can bake in wrong assumptions before any structured evidence gathering happens.
 
 ## Solution
 
-`/call-codex` introduces a structured review harness with explicit role separation:
+`/call-codex` introduces a structured planning harness with explicit role separation:
 
 | Component | Default role |
 |---|---|
-| Cursor / Composer | Main executor and implementation agent |
-| Codex | Read-only reviewer and second opinion |
-| User | Approves risky, expensive, state-changing, or write-enabled actions |
+| Codex | First read-only investigator and implementation planner |
+| Cursor / Composer | Launcher before Codex; implementation harness after user approves the plan |
+| User | Approves planning depth, Codex execution, and all edits |
 
-## Why Cursor stays the main executor
+## Why Codex plans first
 
-Cursor already has session context, repository access, edit tools, and verification workflows. It should remain responsible for:
+Codex is invoked when the task benefits from a dedicated read-only investigation pass:
 
-- preparing the implementation plan
-- making edits
-- running approved verification
-- deciding whether to act on review feedback
-- git workflow (with user approval)
+- gather evidence from relevant files
+- surface assumptions and unknowns
+- propose a minimal safe plan
+- produce a compact execution packet for Cursor
 
-Codex is invoked only when a second opinion adds value.
+Cursor must not pre-empt this by reading the repository, inspecting Git, or drafting its own plan first.
+
+## Why Cursor stays the implementation harness
+
+Cursor already has session context, edit tools, and verification workflows. After the user approves a Codex plan, Cursor should:
+
+- implement the approved scope
+- run user-approved verification
+- manage git workflow (with user approval)
+
+Codex does not edit files by default.
 
 ## Why Codex is read-only by default
 
-Review quality improves when the reviewer cannot silently mutate the workspace. Read-only mode:
+Planning quality improves when the investigator cannot silently mutate the workspace. Read-only mode:
 
-- reduces accidental edits
-- makes the review boundary explicit
+- reduces accidental edits during investigation
+- makes the planning boundary explicit
 - keeps the user in control of state changes
-- limits blast radius if the reviewer misjudges context
+- limits blast radius if the planner misjudges context
 
-## Why sequential review, not autonomous orchestration
+## Why sequential planning, not autonomous orchestration
 
 This repository intentionally avoids agent-swarm patterns. A predictable sequence is easier to reason about:
 
-1. Cursor prepares context and a review prompt.
-2. The user approves depth, command, and execution.
-3. Codex returns structured findings.
-4. Cursor decides what to change.
+1. User describes the task; Cursor prepares the Codex prompt (launcher only).
+2. User approves planning depth, command, and execution.
+3. Codex investigates read-only and returns a structured plan.
+4. User approves, modifies, or rejects the plan.
+5. Cursor implements only after explicit approval.
 
 Autonomous loops between agents can be fast, but they are harder to audit, harder to cost-control, and harder to stop mid-flight.
 
-## Why structured findings matter
+## Why structured planning output matters
 
-Vague opinions ("looks fine", "maybe add tests") are hard to act on. The required output format forces:
+Vague plans ("update the module", "add tests") are hard to execute safely. The required output format forces:
 
-- a clear verdict
-- severity-ranked findings with evidence
-- explicit uncertainty
-- scoped follow-up for Cursor
+- verified evidence vs assumptions
+- ordered implementation steps
+- explicit target files and non-goals
+- focused verification commands
+- scoped Cursor-ready execution prompt
 
-That structure makes review output comparable across sessions and easier to triage.
+That structure makes planning output comparable across sessions and easier to approve.
 
 ## Why this repository is opinionated
 
 The skill encodes defaults that reflect practical trade-offs:
 
 - approval before Codex runs
+- launcher-only Cursor before Codex
 - read-only sandbox by default
-- narrow context bundles instead of whole-repo dumps
-- cost-awareness (one call unless asked for more)
-- correctness over ideology in review criteria
+- one Codex call unless asked for more
+- no default post-implementation review role
 
 Users can adapt the skill, but the defaults optimize for safety and predictability.
 
@@ -73,7 +84,7 @@ Users can adapt the skill, but the defaults optimize for safety and predictabili
 
 This workflow supplements — not replaces — tests, CI, code review, and human judgment. It is most useful when:
 
-- a plan is risky but not yet implemented
-- a diff is small but touches shared infrastructure
-- verification is incomplete
-- the implementer wants a structured critique before proceeding
+- the task spans multiple files or subsystems
+- root cause is unclear
+- architecture or evaluation methodology is sensitive
+- a wrong assumption would be expensive to fix later

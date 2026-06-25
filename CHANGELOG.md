@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.0] - 2026-06-26
+
+### Changed
+
+- **Codex-first planning:** Codex is now the first read-only repository investigator and implementation planner
+- **Launcher-only Cursor:** Before Codex runs, Cursor must not read the repository, inspect Git, call MCPs, build auto-context bundles, or create its own implementation plan
+- Renamed planning workflow from review depth to **planning depth** (`Codex planning depth` popup)
+- Prompt files now use `codex-plan.*` temporary paths instead of `codex-review.*`
+- Workflow-only mode stops after prompt/command preview; run-approval popup is deferred to a later turn
+- Normal mode: planning-depth popup, prompt preview, then run-approval popup with `Cancel / Not yet` as default
+- Removed default post-implementation second-opinion reviewer role from the skill contract
+- Updated README, docs, examples, smoke tests, and doctor drift detection for v0.2.0
+
+### Security
+
+- No change to read-only containment defaults; workspace-write remains explicit opt-in only
+- Cursor no longer pre-gathers git diffs or file contents before user-approved Codex execution
+
 ## [0.1.3] - 2026-06-24
 
 ### Changed

@@ -6,12 +6,13 @@ Thank you for considering a contribution to `cursor-codex-reviewer`.
 
 - Open an issue for defects, unclear behavior, missing documentation, or environment compatibility problems.
 - Keep pull requests scoped to a single concern.
-- Preserve read-only-by-default behavior unless there is a documented, user-approved exception.
+- Preserve Codex-first launcher behavior: Cursor must not inspect the repository before Codex runs unless the user explicitly approves a different workflow.
+- Preserve read-only-by-default Codex execution unless there is a documented, user-approved exception.
 - Avoid autonomous multi-agent orchestration without prior discussion.
 - Do not add telemetry, tracking, analytics, or external services.
 - Do not embed private assumptions, paths, credentials, or machine-specific configuration.
 - Test shell scripts with `bash -n` and run `tests/smoke-test.sh` before opening a pull request.
-- Explain any change that affects safety, approval gates, or sandbox behavior.
+- Explain any change that affects safety, approval gates, launcher contract, or sandbox behavior.
 
 ## Pull request checklist
 

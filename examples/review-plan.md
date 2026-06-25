@@ -1,73 +1,71 @@
-# Example: Review a Plan Before Implementation
+# Example: Plan Before Implementation
 
 Fictional project: **notify-hub** — webhook dispatch service.
 
-## 1. Plan exists before coding
+## 1. User describes the task (no Cursor plan yet)
 
-**User:** I want to add retry with exponential backoff for failed webhook deliveries. Here's my plan:
+**User:** `/call-codex add retry with exponential backoff for failed webhook deliveries`
 
-1. Add `retry_count` column to `deliveries` table.
-2. On failure, requeue with delay `2 ** retry_count` seconds.
-3. Max 5 retries, then mark dead-letter.
-4. Use in-process `sleep()` in the worker loop.
+Cursor does **not** read `schema.sql`, `worker.py`, or Git state. It asks for planning depth.
 
-Cursor drafts the plan but has not edited files yet.
+## 2. User selects depth and approves Codex
 
-## 2. User asks Codex to critique the plan
+User chooses **B) Standard — high**. Cursor shows the prompt summary, exact read-only command, and `Codex next step` popup. User selects **Run Codex now**.
 
-**User:** `/call-codex review this plan before I implement it`
-
-Cursor gathers minimal context (schema file names, worker module paths) and prepares a read-only Codex prompt. User chooses **B) Standard review** and approves execution.
-
-## 3. Codex identifies risks and gaps
+Codex investigates relevant files read-only and returns:
 
 ```markdown
-# Verdict
+## Scope Read
+- `migrations/`, `src/worker.py`, `src/models/delivery.py`, `tests/test_worker.py`
 
-Changes requested
+## Evidence
+- Worker uses a single-threaded poll loop in `worker.py`.
+- `deliveries` table has no `retry_count` or `next_attempt_at` column today.
+- Failed deliveries are logged but not requeued.
 
-# Findings
+## Assumptions and Unknowns
+- Upstream webhook consumers may or may not support idempotency keys (not found in repo).
+- Production queue backend assumed PostgreSQL from migration style.
 
-## High — In-process sleep blocks worker throughput
-- **Summary:** `sleep()` in the worker loop stalls concurrent deliveries.
-- **Evidence:** Plan step 4; `worker.py` uses a single-threaded poll loop.
-- **Why it matters:** Backoff should schedule future attempts, not block the worker.
-- **Suggested next step:** Store `next_attempt_at` and skip until due.
+## Recommended Plan
+1. Add `retry_count` and `next_attempt_at` columns via migration.
+2. On failure, schedule next attempt with exponential delay capped at max retries.
+3. Use `next_attempt_at` selection in the worker loop instead of blocking `sleep()`.
+4. Dead-letter after max retries.
 
-## Medium — Migration lacks rollback story
-- **Summary:** Adding `retry_count` is forward-only in the plan.
-- **Evidence:** Plan step 1 only mentions add column.
-- **Why it matters:** Failed deploy rollback may leave schema/code mismatch.
-- **Suggested next step:** Document reversible migration or deploy in two phases.
+## Execution Packet for Cursor
 
-## Medium — No idempotency discussion
-- **Summary:** Retries may double-deliver if upstream lacks idempotency keys.
-- **Evidence:** Plan does not mention `Idempotency-Key` header or dedupe store.
-- **Why it matters:** Webhook consumers may process duplicates incorrectly.
-- **Suggested next step:** Define idempotency contract in plan.
+### Target Files
+- `migrations/YYYYMMDD_add_delivery_retry.sql`
+- `src/models/delivery.py`
+- `src/worker.py`
+- `tests/test_worker_retry.py`
 
-# Test and verification gaps
+### Constraints
+- Do not block the worker loop with in-process sleep.
+- Preserve existing delivery success path.
 
-- Missing test strategy for clock skew on `next_attempt_at`.
-- Suggested verification: unit tests for scheduler selection + integration test with fake clock.
+### Non-goals
+- Idempotency contract with consumers (document as follow-up).
+- UI changes for dead-letter inspection.
 
-# Assumptions and uncertainty
+### Acceptance Criteria
+- Failed delivery is requeued with increasing delay until max retries.
+- Worker continues processing other deliveries while waiting.
 
-- Did not inspect actual `worker.py` concurrency model in depth.
-- Assumed PostgreSQL-backed queue from file names only.
+### Focused Verification
+- `pytest tests/test_worker_retry.py -q` (not yet run)
 
-# Suggested Cursor follow-up
+### Cursor-Ready Prompt
+Implement retry scheduling per Recommended Plan. Touch only listed target files. Do not run full integration suite.
 
-1. Revise plan to use `next_attempt_at` instead of `sleep()`.
-2. Add migration rollback notes.
-3. Add idempotency section before implementation.
+## Risks
+- Retries without idempotency may double-deliver.
+- Migration rollback story should be documented in the migration file.
 ```
 
-## 4. Cursor updates the plan before coding
+## 3. User approves implementation
 
-Cursor revises the plan:
-- replace `sleep()` with `next_attempt_at`
-- add two-phase migration note
-- add idempotency requirements
+**User:** Implement the Codex plan.
 
-**User approves the revised plan.** Only then does Cursor start implementation.
+Cursor implements using the execution packet. Codex is not invoked again automatically.
