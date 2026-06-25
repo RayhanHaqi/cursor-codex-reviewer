@@ -93,6 +93,6 @@ echo
 echo "Next steps:"
 echo "  1. Restart Cursor or reload skills if needed."
 echo "  2. Run ./scripts/doctor.sh to verify setup."
-echo "  3. In Cursor, try: /call-codex review this implementation"
+echo "  3. In Cursor, try: /call-codex add retry with exponential backoff for failed deliveries"
 echo
 echo "Note: Codex CLI must be installed and authenticated separately."

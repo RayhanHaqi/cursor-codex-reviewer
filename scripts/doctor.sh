@@ -13,8 +13,12 @@ NOTES=0
 
 LEGACY_SKILL_PATTERNS=(
   '/tmp/codex-review-prompt.md'
+  'codex-review\.'
   'CODEX_REVIEW_ENV_FILE'
   '\.bashrc'
+  'Auto-context bundle'
+  'read-only second-opinion reviewer'
+  'skill-release: 0\.1\.'
 )
 
 usage() {
@@ -84,7 +88,7 @@ else
   note "cursor CLI not found in PATH. The desktop app may still work; this is not blocking."
 fi
 
-# Codex CLI (blocking for actual review runs)
+# Codex CLI (blocking for actual planning runs)
 if command -v codex >/dev/null 2>&1; then
   echo "codex:  $(version_of codex)"
   if ! codex exec --help >/dev/null 2>&1; then
@@ -169,7 +173,7 @@ echo
 if [[ -f "${HOME}/.cursor/mcp.json" ]]; then
   note "Cursor MCP config found at ~/.cursor/mcp.json. Optional integrations may be available."
 else
-  note "No ~/.cursor/mcp.json found. Core review still works; optional MCP integrations are unavailable."
+  note "No ~/.cursor/mcp.json found. Core planning still works; optional MCP integrations may be unavailable during Codex investigation."
 fi
 
 note "The call-codex skill does not source shell profiles or environment files. Launch Cursor with codex on PATH and required variables already configured."

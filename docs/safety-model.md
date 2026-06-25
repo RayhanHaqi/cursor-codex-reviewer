@@ -2,22 +2,23 @@
 
 ## Principles
 
-1. **Read-only by default** — Codex runs with `-s read-only` unless sandbox failure requires an explicit user-approved fallback.
-2. **Explicit approval gates** — No Codex execution without user confirmation.
-3. **Technical containment first** — Read-only sandbox restricts workspace mutation where supported.
-4. **User responsibility** — The user decides whether to act on findings and what data to send.
-5. **Second opinion, not truth** — LLM review can be wrong; findings must be verified.
+1. **Codex-first investigation** — Codex performs the first relevant repository read after user-approved execution.
+2. **Launcher-only Cursor** — Before Codex runs, Cursor must not inspect repository files, Git state, or MCPs.
+3. **Read-only by default** — Codex runs with `-s read-only` unless sandbox failure requires an explicit user-approved fallback.
+4. **Explicit approval gates** — No Codex execution without user confirmation.
+5. **Technical containment first** — Read-only sandbox restricts workspace mutation where supported.
+6. **User responsibility** — The user decides whether to act on the plan and what data to send.
+7. **Evidence-based recommendation, not truth** — LLM planning can be wrong; plans must be verified.
 
 ## Data boundary and privacy
 
-Data boundary: `/call-codex` may send selected repository context, diffs, plans, task descriptions, and logs to Codex. Review the generated prompt before approval. Do not use the skill with confidential code or sensitive data unless your organization's policy and your Codex account configuration permit it.
+Data boundary: `/call-codex` sends the user task to Codex; Codex independently reads relevant repository files during its investigation when you approve execution. Review the generated prompt summary before approval. Do not use the skill with confidential code or sensitive data unless your organization's policy and your Codex account configuration permit it.
 
-- Prompt context should be minimized by default.
-- Full repository diffs should not be included blindly.
-- Users should approve the generated prompt before Codex runs.
-- Sensitive files should be excluded by default where practical.
+- Cursor does not pre-gather repository context before Codex runs.
+- Users should approve the generated prompt summary before Codex executes.
+- Codex is instructed to avoid sensitive files, credentials, datasets, checkpoints, and large artifacts.
 
-Default sensitive-path exclusions during prompt gathering:
+Default sensitive-path exclusions during Codex investigation:
 
 ```text
 .env
@@ -32,11 +33,17 @@ node_modules/
 vendor/
 dist/
 build/
+datasets/
+checkpoints/
+model weights
+large binaries
+generated artifacts
+report PDFs
 ```
 
-This exclusion list does not guarantee sensitive data cannot be sent.
+This exclusion list does not guarantee sensitive data cannot be read.
 
-Review prompts are written to unique private temporary files (`mktemp` + `chmod 600`) and cleaned up automatically unless the user explicitly opts to keep them for debugging.
+Planning prompts are written to unique private temporary files (`codex-plan.*`, `mktemp` + `chmod 600`) and cleaned up automatically unless the user explicitly opts to keep them for debugging.
 
 ## Sandbox modes
 
@@ -45,13 +52,13 @@ Review prompts are written to unique private temporary files (`mktemp` + `chmod 
 Meaning:
 
 - Codex runs with a read-only sandbox where supported.
-- Codex is instructed to review only.
+- Codex is instructed to plan only; no edits, commits, or long-running commands.
 - Workspace mutation is technically restricted by sandbox configuration.
 
 Preferred invocation:
 
 ```bash
-PROMPT_FILE="$(mktemp "${TMPDIR:-/tmp}/codex-review.XXXXXX.md")"
+PROMPT_FILE="$(mktemp "${TMPDIR:-/tmp}/codex-plan.XXXXXX.md")"
 chmod 600 "${PROMPT_FILE}"
 trap 'rm -f "${PROMPT_FILE}"' EXIT
 
@@ -60,7 +67,7 @@ codex -m gpt-5.5 -c 'model_reasoning_effort="xhigh"' -s read-only -a untrusted -
 
 - `-s read-only`: model-generated shell commands run in a read-only sandbox.
 - `-a untrusted`: only trusted commands run without prompting.
-- `-C "$PWD"`: review is scoped to the working directory.
+- `-C "$PWD"`: planning is scoped to the working directory.
 
 ### Fallback mode: Degraded containment fallback
 
@@ -137,11 +144,11 @@ Actions that require explicit user approval before Codex or Cursor runs them:
 
 ## Commit and push restrictions
 
-The skill explicitly forbids Codex from committing or pushing. Cursor must also ask the user before any git write operations prompted by review feedback.
+The skill explicitly forbids Codex from committing or pushing. Cursor must also ask the user before any git write operations.
 
 ## Dependency and migration restrictions
 
-Review feedback may suggest dependency upgrades or schema migrations. These are suggestions only. Implementation requires:
+Plans may suggest dependency upgrades or schema migrations. These are suggestions only. Implementation requires:
 
 1. user approval
 2. normal project verification (tests, CI, staging)
@@ -152,27 +159,27 @@ Review feedback may suggest dependency upgrades or schema migrations. These are 
 The user must:
 
 - approve Codex execution and sandbox mode
-- review the generated prompt before sending data to Codex
-- review findings critically
-- run meaningful verification
+- review the generated prompt summary before sending data to Codex
+- review the plan critically
+- run meaningful verification after implementation
 - decide what changes to implement
 
 ## Limitations of sandboxing
 
 Sandboxing reduces risk but does not eliminate it:
 
-- read-only review can still read sensitive files if they are in scope
+- read-only planning can still read sensitive files if they are in scope
 - instructions may be misinterpreted
 - `workspace-write` weakens technical write protection even when Codex is instructed not to edit
 - sandbox behavior depends on Codex CLI version and OS configuration
 
-## Limitations of LLM review
+## Limitations of LLM planning
 
-- findings may be hallucinated
+- plans may be based on hallucinated files or APIs
 - evidence may reference wrong lines or files
 - security issues may be missed
 - performance regressions may not be detected without benchmarks
-- review does not replace tests, CI, or human code review
+- planning does not replace tests, CI, or human code review
 
 ## Examples requiring approval
 

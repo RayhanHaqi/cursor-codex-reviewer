@@ -49,7 +49,7 @@ Run:
 **Symptom:** Quota errors, rate limits, or model unavailable.
 
 **Fix:**
-1. Retry later or choose a lower review depth.
+1. Retry later or choose C) Quick.
 2. Check billing and usage in your OpenAI/Codex account.
 3. If `gpt-5.5` is unsupported for your account, report the exact CLI error and stop. Do not silently substitute another model; get explicit user approval before trying a different model.
 
@@ -95,33 +95,32 @@ bash ./scripts/install.sh
 
 The skill assumes bash-style command examples for Codex invocation.
 
-## Large repository context issues
+## Large repository planning issues
 
-**Symptom:** Review is slow, expensive, or misses relevant files.
-
-**Fix:**
-1. Use review depth B or C for smaller context.
-2. Narrow the task description to specific files or modules.
-3. Provide a focused diff summary in the Cursor plan.
-4. Avoid pasting large logs into the prompt.
-
-## Slow or expensive review requests
-
-**Symptom:** Deep review consumes significant quota.
+**Symptom:** Planning is slow, expensive, or misses relevant areas.
 
 **Fix:**
-1. Choose C) Quick review for sanity checks.
-2. Use `/call-codex workflow only` to inspect the prompt before running.
-3. Limit auto-context gathering to changed files.
+1. Use planning depth B or C for smaller investigations.
+2. Narrow the task description to specific files, modules, or symptoms.
+3. Describe constraints and non-goals explicitly in the user task.
+
+## Slow or expensive planning requests
+
+**Symptom:** Deep planning consumes significant quota.
+
+**Fix:**
+1. Choose C) Quick for sanity checks.
+2. Use `/call-codex workflow only` to inspect the prompt and command before running.
+3. Scope the user task to the minimum necessary surface area.
 
 ## Optional integration unavailable
 
-**Symptom:** Context7, MCP, or GitHub tools not working.
+**Symptom:** Context7, MCP, or GitHub tools not working during Codex investigation.
 
 **Fix:**
-1. Configure MCP servers in `~/.cursor/mcp.json` per Cursor docs.
+1. Configure MCP servers in your Codex/Cursor environment per vendor docs.
 2. For Context7, define an optional shell helper that exports `CONTEXT7_API_KEY` from your own secure config — never commit keys.
-3. Proceed without integrations; core review still works.
+3. Proceed without integrations; core planning still works with repository reads only.
 
 ## Version mismatch or command syntax mismatch
 
@@ -140,6 +139,14 @@ The skill assumes bash-style command examples for Codex invocation.
 1. Approve **Degraded containment fallback** (`workspace-write`) only after reading the exact warning that technical write protection is weakened.
 2. Check Codex sandbox documentation for your OS (bubblewrap, user namespaces).
 3. Do not use `danger-full-access` unless in a disposable environment with explicit approval.
+
+## Stale installed skill (v0.1.x patterns)
+
+**Symptom:** Doctor warns about legacy patterns or skill-release mismatch.
+
+**Fix:**
+1. Run `./scripts/install.sh --force` from a current repo checkout.
+2. Confirm installed `SKILL.md` shows `skill-release: 0.2.0` and uses `codex-plan.*` prompt files.
 
 ## Symlink destinations refused
 

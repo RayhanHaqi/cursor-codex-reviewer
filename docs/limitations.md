@@ -1,18 +1,18 @@
 # Limitations
 
-This project is **experimental (v0.1.3)**. Understand these limitations before relying on it.
+This project is **experimental (v0.2.0)**. Understand these limitations before relying on it.
 
-## Review quality
+## Planning quality
 
 - Codex may make incorrect inferences.
 - Codex may hallucinate files, APIs, or failure causes.
-- Review quality depends on the quality and scope of context provided.
-- Large repositories may require narrow review scopes.
-- Findings labeled as assumptions may still influence readers incorrectly if not read carefully.
+- Plan quality depends on task clarity and what Codex can read in the repository.
+- Large repositories may require focused task descriptions.
+- Assumptions labeled in the plan may still influence readers incorrectly if not read carefully.
 
 ## Not a replacement for engineering practice
 
-Read-only Codex review does not replace:
+Codex-first planning does not replace:
 
 - automated tests
 - CI pipelines
@@ -20,6 +20,10 @@ Read-only Codex review does not replace:
 - security review
 - performance benchmarking
 - production monitoring
+
+## Launcher contract limits
+
+The skill instructs Cursor not to investigate before Codex runs, but enforcement depends on Cursor following the skill. Users should verify launcher behavior in their environment.
 
 ## Environment compatibility
 
@@ -45,11 +49,11 @@ CLI authentication, billing, model availability, and rate limits are managed out
 
 ## Optional integrations
 
-Optional integrations (MCP servers, Context7, GitHub tools, web search) may not work in every setup. Core review behavior should still work without them, but enriched context will be unavailable.
+Optional integrations (MCP servers, Context7, GitHub tools, web search) may be used by Codex during investigation when configured. Cursor must not call MCPs before Codex runs. Integrations may not work in every setup.
 
 ## Output format
 
-The structured review format may evolve in future releases. Downstream automation should not assume a frozen schema in v0.1.
+The structured planning format may evolve in future releases. Downstream automation should not assume a frozen schema in v0.2.
 
 ## Sandboxing
 
@@ -57,9 +61,9 @@ Read-only sandboxing depends on OS-level features. Some environments may require
 
 ## Data boundary
 
-- `/call-codex` may transmit repository context, diffs, plans, and logs to Codex when approved.
-- Sensitive-path exclusions reduce risk but do not guarantee sensitive data cannot be sent.
-- Users must review the generated prompt before approval.
+- `/call-codex` transmits the user task to Codex; Codex reads repository files during approved investigation.
+- Sensitive-path exclusions reduce risk but do not guarantee sensitive data cannot be read.
+- Users must review the generated prompt summary before approval.
 
 ## Scope of this repository
 
@@ -75,4 +79,5 @@ It does not provide:
 - Cursor itself
 - MCP server implementations
 - autonomous multi-agent orchestration
-- guaranteed review correctness
+- guaranteed planning correctness
+- a default post-implementation review role
